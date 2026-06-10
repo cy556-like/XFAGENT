@@ -1,0 +1,20 @@
+{
+  "total_messages": 15,
+  "total_sessions": 8,
+  "daily_stats": {
+    "2026-06-10": {
+      "messages": 15,
+      "users": [
+        "admin"
+      ]
+    }
+  },
+  "tool_usage": {},
+  "model_usage": {
+    "glm-5.1": 2,
+    "DeepSeek-V4-Flash": 6,
+    "qwen3.7-plus": 2,
+    "Doubao-Seed-2.0-pro": 2,
+    "mimo-v2.5-pro": 3
+  }
+}
