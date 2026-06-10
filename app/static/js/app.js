@@ -30,6 +30,52 @@ let _lastSyncedAgentsHash = '';
 // 强制只保留2个允许的智能体（内置ID白名单）
 const ALLOWED_AGENT_IDS = ['xf-rd-agent', 'xf-quality-agent'];
 
+// 每个智能体的欢迎页配置（名称、描述、推荐问题）
+const AGENT_WELCOME_CONFIG = {
+    'xf-rd-agent': {
+        name: 'XF模具研发智能体',
+        desc: '专注于模具研发设计与工艺优化，涵盖DFMEA分析、设计评审、工艺验证等核心能力',
+        questions: [
+            '模具设计评审有哪些关键节点？',
+            '帮我分析DFMEA风险',
+            '模具冷却系统如何优化设计？',
+            '冲压工艺参数怎么确定？',
+            '模具材料选型有哪些建议？',
+            '模具寿命如何评估与提升？',
+            '级进模排样设计要点是什么？',
+            '注塑模具浇口设计原则有哪些？'
+        ]
+    },
+    'xf-quality-agent': {
+        name: 'XF模具质量智能体',
+        desc: '专注于模具质量检测与控制，涵盖VDA6.4审核、不合格品处理、CAPA等核心能力',
+        questions: [
+            'VDA6.4过程审核要点是什么？',
+            '不合格品纠正措施怎么制定？',
+            '模具尺寸检测报告怎么写？',
+            'SPC控制图如何分析？',
+            '8D报告怎么编写？',
+            '模具表面缺陷如何分类？',
+            '来料检验标准怎么制定？',
+            'PPAP提交需要哪些文件？'
+        ]
+    }
+};
+
+// 获取智能体欢迎页配置（内置+自定义智能体）
+function getAgentWelcomeConfig(agentId) {
+    if (AGENT_WELCOME_CONFIG[agentId]) return AGENT_WELCOME_CONFIG[agentId];
+    const agent = myAgents.find(a => a.id === agentId);
+    if (agent) {
+        return {
+            name: agent.name,
+            desc: agent.task || '专属AI智能体',
+            questions: ['介绍一下你的能力', '帮我分析一个问题', '给我一些建议', '常见的注意事项有哪些？']
+        };
+    }
+    return null;
+}
+
 function forceCorrectAgents() {
     let existing = [];
     try { existing = JSON.parse(localStorage.getItem('forgeAgents') || '[]'); } catch(e) { existing = []; }
@@ -345,11 +391,16 @@ async function switchToAgent(agentId) {
     // Render agents list
     renderMyAgents();
     
-    // 点击智能体：直接创建新的空白对话页面，不加载历史
+    // 点击智能体：显示空白对话页面（含智能体欢迎信息）
     currentChatId = null;
     modeChatId['agent'] = null;
     clearChatUI();
     renderChatList();
+    // 确保欢迎页可见
+    const welcomeEl = document.getElementById('welcomeCenter');
+    if (welcomeEl) welcomeEl.style.display = '';
+    const chatContent = document.getElementById('chatContent');
+    if (chatContent) chatContent.classList.add('centered');
 }
 
 function renderMyAgents() {
@@ -449,11 +500,12 @@ async function createNewChatForAgent(agentId) {
             // 清空聊天区域，显示新对话界面
             clearChatUI();
 
-            // 隐藏欢迎页，确保输入框可见
+            // 显示智能体专属欢迎页（居中模式）
             const welcomeEl = document.getElementById('welcomeCenter');
-            if (welcomeEl) welcomeEl.style.display = 'none';
+            if (welcomeEl) welcomeEl.style.display = '';
             const chatContent = document.getElementById('chatContent');
-            if (chatContent) chatContent.classList.remove('centered');
+            if (chatContent) chatContent.classList.add('centered');
+            updateWelcomeContent();
 
             // 刷新智能体列表高亮
             renderMyAgents();
@@ -656,14 +708,8 @@ function switchMode(mode) {
     updateKbUploadVisibility();
     updateHeaderKbVisibility();
 
-    const welcomeH2 = document.querySelector('.welcome-center h2');
-    const welcomeP = document.querySelector('.welcome-center p');
-    if (welcomeH2) welcomeH2.textContent = mode === 'agent' ? 'XF模具智能体平台' : 'Chat';
-    if (welcomeP) {
-        welcomeP.textContent = mode === 'agent'
-            ? '智能体锻造引擎，让每个想法都能锻造出专属Agent。'
-            : '通用对话模式，深度思考更精准，随时为您解答各类问题。';
-    }
+    // 切换模式时更新欢迎页内容
+    updateWelcomeContent();
 
     // 切换模式时：筛选该模式的历史对话，恢复该模式上次的会话
     renderChatList();
@@ -1066,6 +1112,50 @@ function updateCenteredMode() {
     const messages = document.getElementById('chatMessages');
     const hasMessages = messages.children.length > 0;
     content.classList.toggle('centered', !hasMessages);
+    // 更新欢迎页内容（根据当前智能体动态显示）
+    updateWelcomeContent();
+}
+
+// 根据当前智能体更新欢迎页内容
+function updateWelcomeContent() {
+    const welcomeEl = document.getElementById('welcomeCenter');
+    if (!welcomeEl) return;
+
+    const config = currentAgentId ? getAgentWelcomeConfig(currentAgentId) : null;
+
+    if (config) {
+        // 智能体专属欢迎页
+        welcomeEl.innerHTML = `
+            <h2 class="welcome-agent-name">${escapeHtml(config.name)}</h2>
+            <p class="welcome-agent-desc">${escapeHtml(config.desc)}</p>
+            <div class="quick-actions">
+                ${config.questions.map(q => `<span class="quick-action" onclick="fillQuick(this)" data-question="${escapeHtml(q)}" role="button" tabindex="0">${escapeHtml(q)}</span>`).join('')}
+            </div>
+        `;
+    } else {
+        // 默认欢迎页
+        welcomeEl.innerHTML = `
+            <h2>XF模具智能体平台</h2>
+            <p>专业模具AI智能体，独立赋能研发与质量管理</p>
+            <div class="quick-actions">
+                <span class="quick-action" onclick="fillQuick(this)" data-question="模具设计评审有哪些关键节点？" role="button" tabindex="0">设计评审</span>
+                <span class="quick-action" onclick="fillQuick(this)" data-question="VDA6.4过程审核要点是什么？" role="button" tabindex="0">过程审核</span>
+                <span class="quick-action" onclick="fillQuick(this)" data-question="帮我分析DFMEA风险" role="button" tabindex="0">DFMEA分析</span>
+                <span class="quick-action" onclick="fillQuick(this)" data-question="不合格品纠正措施怎么制定？" role="button" tabindex="0">CAPA建议</span>
+            </div>
+        `;
+    }
+}
+
+// 点击快捷问题：填入输入框（不自动发送），用户可编辑后发送
+function fillQuick(el) {
+    const text = el.getAttribute('data-question') || el.textContent;
+    const input = document.getElementById('msgInput');
+    if (input) {
+        input.value = text;
+        autoResize(input);
+        input.focus();
+    }
 }
 
 // ===== Chat List =====
@@ -1849,7 +1939,15 @@ async function sendMessage() {
     }
 }
 
-function sendQuick(text) { const input = document.getElementById('msgInput'); input.value = text; autoResize(input); input.focus(); }
+function sendQuick(text) {
+    // 填入输入框但不自动发送，用户可编辑后发送
+    const input = document.getElementById('msgInput');
+    if (input) {
+        input.value = text;
+        autoResize(input);
+        input.focus();
+    }
+}
 
 function addMessageToUI(role, content, imageBase64) {
     const container = document.getElementById('chatMessages');
