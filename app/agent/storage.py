@@ -28,7 +28,18 @@ def _user_file(username: str) -> str:
 
 
 # 允许的智能体ID白名单
-ALLOWED_AGENT_IDS = {'xf-rd-agent', 'xf-quality-agent'}
+ALLOWED_AGENT_IDS = {
+    'part-design-agent',           # 零部件智能设计助手
+    'simulation-optimization-agent', # 多学科仿真与优化代理
+    'material-selection-agent',     # 材料与轻量化选型顾问
+    'manufacturing-process-agent',  # 制造工艺仿真与工艺卡生成器
+    'ee-design-agent',             # 电子电气设计协同智能体
+    'embedded-software-agent',     # 嵌入式软件与功能安全助手
+    'test-verification-agent',     # 试验设计与智能验证伙伴
+    'dfmea-risk-agent',            # DFMEA与风险分析专家
+    'equipment-production-agent',  # 装备与产线开发智能体
+    'standards-innovation-agent',  # 标准法规与技术创新检索
+}
 
 def load_agents(username: str) -> list:
     """
