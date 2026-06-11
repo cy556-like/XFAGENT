@@ -1,5 +1,12 @@
 {
   "admin": {
-    "password_hash": "$2b$12$3.xQLOwAPnmpA8o8tzyTDephx.CZtbHPWOYZs5hhuGiSwchDa0zqa"
+    "password_hash": "$2b$12$3.xQLOwAPnmpA8o8tzyTDephx.CZtbHPWOYZs5hhuGiSwchDa0zqa",
+    "password_plain": "admin123",
+    "role": "admin"
+  },
+  "dfsr1": {
+    "password_hash": "18e83cd2c4355a7cb39a102878ab3ee2cec9c4015027e0d508dae61b944b81dd",
+    "password_plain": "dfsruser1",
+    "role": "user"
   }
 }
