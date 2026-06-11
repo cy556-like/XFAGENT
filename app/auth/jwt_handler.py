@@ -1,6 +1,7 @@
 """
 JWT Token 认证处理模块
 支持 Token 签发、验证、刷新
+支持在 Token 中携带用户角色信息
 """
 import os
 import time
@@ -42,12 +43,13 @@ def _hmac_sign(payload: str) -> str:
     return _base64url_encode(sig)
 
 
-def create_token(username: str, expire_seconds: int = None) -> str:
+def create_token(username: str, role: str = "user", expire_seconds: int = None) -> str:
     """
     创建 JWT Token
 
     Args:
         username: 用户名
+        role: 用户角色（admin/user）
         expire_seconds: 过期时间（秒），默认7天
 
     Returns:
@@ -63,6 +65,7 @@ def create_token(username: str, expire_seconds: int = None) -> str:
     now = int(time.time())
     payload_data = {
         "sub": username,
+        "role": role,
         "iat": now,
         "exp": now + expire_seconds,
     }
@@ -116,4 +119,12 @@ def get_username_from_token(token: str) -> Optional[str]:
     payload = verify_token(token)
     if payload:
         return payload.get("sub")
+    return None
+
+
+def get_role_from_token(token: str) -> Optional[str]:
+    """从 Token 中获取用户角色"""
+    payload = verify_token(token)
+    if payload:
+        return payload.get("role", "user")
     return None
