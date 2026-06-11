@@ -1110,11 +1110,11 @@ async def chat_with_file_stream(
 
 @router.post("/upload", summary="上传文档到知识库")
 
-async def upload_document(file: UploadFile = File(...), agent_id: str = Form(None)):
+async def upload_document(file: UploadFile = File(...), agent_id: str = Form(None), username: str = Depends(require_auth)):
 
     """
 
-    上传文档并自动索引到向量数据库
+    上传文档并自动索引到向量数据库（需登录认证）
 
     支持 PDF、TXT、MD、DOCX 格式
 
@@ -2021,11 +2021,11 @@ async def download_export_document(filename: str):
 
 @router.delete("/documents/{filename}", summary="从知识库删除文档")
 
-async def delete_document_api(filename: str, agent_id: str = Query(None, description="智能体ID，为空时删全局知识库文档")):
+async def delete_document_api(filename: str, agent_id: str = Query(None, description="智能体ID，为空时删全局知识库文档"), admin: str = Depends(require_admin)):
 
     """
 
-    从知识库中删除指定文档
+    从知识库中删除指定文档（仅管理员可操作）
 
     同时删除 ChromaDB 中的向量分块和原始文件
 
@@ -2821,11 +2821,11 @@ async def get_agents(authorization: str = Header(None)):
 
 @router.delete("/agents/{agent_id}/knowledge", summary="删除智能体的知识库")
 
-async def delete_agent_knowledge(agent_id: str):
+async def delete_agent_knowledge(agent_id: str, admin: str = Depends(require_admin)):
 
     """
 
-    删除智能体对应的整个 ChromaDB collection
+    删除智能体对应的整个 ChromaDB collection（仅管理员可操作）
 
     在删除智能体时调用，确保知识库数据同步清理
 
