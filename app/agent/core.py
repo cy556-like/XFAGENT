@@ -41,26 +41,33 @@ logger = logging.getLogger(__name__)
 # 1. 跨 HTTP 请求隔离 → 新请求看不到旧请求的 cancel_event → 无法取消幽灵任务
 # 2. CancelledError handler 从未调用 cancel_event.set() → _is_session_cancelled() 永远返回 False
 # v6 改用全局 dict + threading.Lock + session_id 索引，并在取消时真正 set 事件
-_session_cancel_events: dict[str, threading.Event] = {}
+# [BUG FIX v7] 会话取消信号：全局 dict 按 session_id 追踪取消状态
+# v6 用 contextvars.ContextVar 有两个致命缺陷：
+# 1. 跨 HTTP 请求隔离 → 新请求看不到旧请求的 cancel_event → 无法取消幽灵任务
+# 2. CancelledError handler 从未调用 cancel_event.set() → _is_session_cancelled() 永远返回 False
+# v6 改用全局 dict + threading.Lock + session_id 索引，并在取消时真正 set 事件
+# v7 增加 created_at 时间戳，定期清理超时条目，防止长时间运行后字典无限增长
+_session_cancel_events: dict[str, tuple] = {}  # session_id -> (threading.Event, created_at)
 _session_cancel_lock = threading.Lock()
+_SESSION_CANCEL_TTL = 1800  # 30分钟，超过此时间的条目在定期清理时删除
 
 def _get_or_create_cancel_event(session_id: str) -> threading.Event:
     """为 session 获取或创建取消事件，同时取消同一 session 的上一个事件"""
     with _session_cancel_lock:
-        old = _session_cancel_events.pop(session_id, None)
-        if old is not None:
-            old.set()  # 取消同一 session 的上一个幽灵任务
+        old_entry = _session_cancel_events.pop(session_id, None)
+        if old_entry is not None:
+            old_entry[0].set()  # 取消同一 session 的上一个幽灵任务
             logger.info(f"[取消追踪] 已取消 session={session_id} 的上一个 Agent 任务")
         evt = threading.Event()
-        _session_cancel_events[session_id] = evt
+        _session_cancel_events[session_id] = (evt, time.time())
         return evt
 
 def _set_session_cancelled(session_id: str):
     """标记 session 已取消，阻止 think() 发起新的 LLM 调用"""
     with _session_cancel_lock:
-        evt = _session_cancel_events.get(session_id)
-        if evt is not None:
-            evt.set()
+        entry = _session_cancel_events.get(session_id)
+        if entry is not None:
+            entry[0].set()
 
 def _cleanup_session_cancel(session_id: str):
     """正常结束时清理取消事件"""
@@ -77,10 +84,30 @@ def _is_session_cancelled(session_id: str = None) -> bool:
     if not sid:
         return False
     with _session_cancel_lock:
-        evt = _session_cancel_events.get(sid)
-    if evt is not None and evt.is_set():
+        entry = _session_cancel_events.get(sid)
+    if entry is not None and entry[0].is_set():
         return True
     return False
+
+def _cleanup_stale_cancel_events():
+    """[v7] 清理超时的取消事件条目，防止长时间运行后字典无限增长
+    
+    清理策略：
+    1. 超过 TTL（30分钟）的条目直接删除
+    2. 已取消/已完成（is_set）的条目也删除（任务已结束，不再需要追踪）
+    """
+    now = time.time()
+    with _session_cancel_lock:
+        stale = []
+        for sid, entry in _session_cancel_events.items():
+            evt, created_at = entry
+            # 已取消的事件 或 超时的条目，都可以清理
+            if evt.is_set() or (now - created_at > _SESSION_CANCEL_TTL):
+                stale.append(sid)
+        for sid in stale:
+            del _session_cancel_events[sid]
+    if stale:
+        logger.info(f"[缓存清理] 清理了 {len(stale)} 个过期取消事件条目，剩余 {len(_session_cancel_events)}")
 
 # 最大历史消息数量（保留足够上下文保证多轮对话质量）
 MAX_HISTORY_MESSAGES = 30
@@ -463,9 +490,11 @@ def cleanup_stale_caches():
     由 main.py 的定期清理任务每5分钟调用一次。
     清理内容：
     1. 超过30分钟未使用的 Agent Graph 缓存
-    2. [v8] 超过 TTL 的 LLM Client 缓存（TCP连接空闲后被服务端关闭，必须重建）
+    2. [v7] 超过 TTL 或已完成的取消事件条目
+    3. [v8] 超过 TTL 的 LLM Client 缓存（TCP连接空闲后被服务端关闭，必须重建）
     """
     _cleanup_stale_graph_cache()
+    _cleanup_stale_cancel_events()  # [v7] 清理超时/已完成的取消事件
     
     # [v8 修复] 清理超过 TTL 的 LLM Client 缓存
     # 旧代码 guard len(_llm_cache) > 2 在典型单模型场景下永远不执行
