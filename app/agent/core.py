@@ -82,8 +82,8 @@ def _is_session_cancelled(session_id: str = None) -> bool:
         return True
     return False
 
-# 最大历史消息数量（加速推理，避免上下文过长）
-MAX_HISTORY_MESSAGES = 10
+# 最大历史消息数量（保留足够上下文保证多轮对话质量）
+MAX_HISTORY_MESSAGES = 30
 
 # [#6] 多步骤任务编排：最大工具调用轮数
 # 从8降到5：大多数场景2-3次搜索+1次导出即完成，8轮导致LLM过度搜索
@@ -94,64 +94,62 @@ MAX_TOOL_ROUNDS = 5
 MAX_TOOL_RETRIES = 2
 RETRYABLE_TOOL_ERRORS = ["搜索失败", "未找到", "连接", "超时", "timeout", "error"]
 
-# 意图路由：简单问题关键词（匹配这些关键词的问题直接用Chat模式，跳过Agent工具调用）
-# [性能优化] 扩展了通用简单问题的覆盖范围，减少不必要的Agent循环
+# 意图路由：仅纯闲聊/打招呼才走 Chat 模式，其余一律走 Agent 保证质量
+# [质量修复] 大幅收紧简单问题判定，避免专业问题被误路由导致降级
 SIMPLE_QUERY_PATTERNS = [
-    # 闲聊
+    # 纯闲聊/打招呼（仅这些确定不需要工具调用）
     "你好", "嗨", "hello", "hi", "你是谁", "你叫什么", "介绍一下你自己",
     "谢谢", "感谢", "再见", "拜拜", "好的", "知道了",
-    # 常识/短问答
-    "是什么", "什么是", "怎么读", "怎么写", "怎么说",
-    "多少", "等于", "算", "翻译", "今天是", "天气",
-    "为什么", "怎么样", "什么意思",
 ]
 # 简单问题的最大字符数（超过此长度认为不是简单问题）
-SIMPLE_MAX_LENGTH = 20
+SIMPLE_MAX_LENGTH = 8  # 仅极短的打招呼/闲聊才判定为简单问题
 
 def _is_simple_query(query: str) -> bool:
-    """判断用户输入是否为简单问题（不需要工具调用的闲聊/通用问题）
+    """判断用户输入是否为简单问题（不需要工具调用的纯闲聊/打招呼）
     
-    简单问题走 Chat 模式直接回答，跳过 Agent 的 Think→Act→Observe 循环，
-    可以将响应时间从 3-5秒 降低到 0.5-1秒（首Token延迟）。
-    
-    [性能优化] 新增长度回退：短问题（≤15字）即使不匹配关键词，也大概率是简单问题
+    [质量修复] 收紧判定逻辑：
+    - 仅纯闲聊/打招呼走 Chat 模式，避免专业问题被误杀
+    - 移除"是什么""什么是""为什么"等泛化关键词（这些可能是专业问题的开头）
+    - 移除短文本回退（≤15字就判定简单），因为很多专业问题也很短
     """
     query_stripped = query.strip()
     query_lower = query_stripped.lower()
     
-    # 1. 精确关键词匹配
+    # 1. 仅精确匹配纯闲聊关键词
     for pattern in SIMPLE_QUERY_PATTERNS:
         if pattern in query_lower:
             return True
     
-    # 2. [性能优化] 短文本回退：≤15字的短问题大概率不需要工具调用
-    # 排除包含知识库关键词的（如"制度""流程""规范""员工""文档"）
-    if len(query_stripped) <= SIMPLE_MAX_LENGTH:
-        knowledge_keywords = ["制度", "流程", "规范", "员工", "文档", "政策", "规定", "公司", "部门"]
-        if not any(kw in query_stripped for kw in knowledge_keywords):
-            # 不包含数字和问号（可能是简单编程/计算问题）
+    # 2. 极短且不含问号/专业词的纯打招呼（≤8字且无问号）
+    if len(query_stripped) <= SIMPLE_MAX_LENGTH and '？' not in query_stripped and '?' not in query_stripped:
+        # 再排除可能包含专业意图的短句
+        professional_hints = ["怎么做", "怎么写", "帮我", "分析", "生成", "检查", "评估", "写", "画"]
+        if not any(h in query_stripped for h in professional_hints):
             return True
     
     return False
 
 def _inject_current_date(system_prompt: str) -> str:
-    """[Prompt Caching] 返回原始 prompt，日期不再注入 system prompt。
+    """将当前日期注入 system prompt 尾部
     
-    之前日期注入 system prompt 尾部导致前缀每天变化，破坏 API 端 prompt caching。
-    现改为在消息列表中插入独立的日期消息，system prompt 前缀保持 100% 稳定。
+    [质量修复] 日期信息不再以假 HumanMessage 形式插入消息列表，
+    而是直接追加到 system prompt 末尾。假 HumanMessage 会干扰模型对对话流的
+    理解，模型可能将其视为用户输入的一部分，影响回答质量。
+    
+    虽然每天日期变化会导致 prompt caching 效率略降，但对话质量更重要。
     """
-    return system_prompt
+    now = datetime.now()
+    date_text = f"\n\n[当前日期：{now.strftime('%Y年%m月%d日')}，星期{['一','二','三','四','五','六','日'][now.weekday()]}。请在回答中涉及时间信息时使用正确的当前日期，严禁编造日期。]"
+    return system_prompt + date_text
 
 
 def _get_date_message() -> HumanMessage:
-    """[Prompt Caching 优化] 将日期信息作为独立消息而非注入 system prompt
-    
-    这样 system prompt 前缀 100% 稳定不变，OpenAI/兼容 API 的自动 prompt 
-    caching 可以复用前缀计算，首 token 延迟降低 50-85%。
+    """已废弃：日期信息现在通过 _inject_current_date() 注入 system prompt 尾部。
+    保留此函数但不再使用，避免其他模块调用时报错。
     """
-    now = datetime.now()
-    date_text = f"[当前日期：{now.strftime('%Y年%m月%d日')}，星期{['一','二','三','四','五','六','日'][now.weekday()]}。请在回答中涉及时间信息时使用正确的当前日期，严禁编造日期。]"
-    return HumanMessage(content=date_text)
+    # 返回一个无害的空 HumanMessage（不再包含日期信息）
+    # 调用方会在后续统一清理
+    return HumanMessage(content="")
 
 # ===== 1. 定义 Agent 状态 =====
 class AgentState(TypedDict):
@@ -230,15 +228,15 @@ def create_llm(deep_think: bool = False, fast_mode: bool = False, model_override
     else:
         api_key = settings.LLM_API_KEY_BACKUP if use_backup else settings.LLM_API_KEY
         base_url = settings.LLM_BASE_URL_BACKUP if use_backup else settings.LLM_BASE_URL
-    temperature = 0.3 if deep_think else 0.1
+    temperature = 0.7 if deep_think else 0.6
     
-    # [性能优化] 智能 max_tokens：短回复场景减少预分配，加速推理
+    # 智能 max_tokens：保证模型有足够输出空间，避免回答被截断
     if short_response:
-        max_tokens = 1024   # 闲聊、简单问题最多 1024 token
+        max_tokens = 4096   # 短回复场景（闲聊等），4096 足够且不会过度截断
     elif deep_think:
-        max_tokens = 8192   # 深度思考需要更多输出空间
+        max_tokens = 16384  # 深度思考需要充足输出空间
     else:
-        max_tokens = 6144   # 正常 Agent 模式（DFMEA等复杂任务需要足够空间，不能太低）
+        max_tokens = 8192   # 正常 Agent 模式（DFMEA等复杂任务需要足够空间）
     
     # [性能优化] request_timeout 分档：
     # - 短回复 45s（足够且不会让用户等太久）
@@ -397,10 +395,9 @@ def create_agent_graph(web_search: bool = False):
             logger.warning("检测到会话已取消，跳过 LLM 调用")
             raise RuntimeError("Session cancelled by user")
         messages = state["messages"]
+        # [质量修复] 日期已通过 _inject_current_date() 注入 system_prompt 尾部，不再插入假 HumanMessage
         system_msg = SystemMessage(content=system_prompt)
-        # [Prompt Caching] 日期独立消息，system prompt 前缀保持稳定
-        date_msg = _get_date_message()
-        response = await llm_with_tools.ainvoke([system_msg, date_msg] + messages)
+        response = await llm_with_tools.ainvoke([system_msg] + messages)
         return {"messages": [response]}
 
     tool_node = ParallelToolNode(tools, messages_key="messages")
@@ -644,10 +641,9 @@ def get_agent_with_prompt(custom_system_prompt: str, web_search: bool = False):
             logger.warning("检测到会话已取消，跳过 LLM 调用（自定义智能体）")
             raise RuntimeError("Session cancelled by user")
         messages = state["messages"]
+        # [质量修复] 日期已通过 _inject_current_date() 注入 system_prompt 尾部，不再插入假 HumanMessage
         system_msg = SystemMessage(content=custom_system_prompt)
-        # [Prompt Caching] 日期独立消息
-        date_msg = _get_date_message()
-        response = await llm_with_tools.ainvoke([system_msg, date_msg] + messages)
+        response = await llm_with_tools.ainvoke([system_msg] + messages)
         return {"messages": [response]}
 
     tool_node = ParallelToolNode(tools, messages_key="messages")
@@ -967,9 +963,10 @@ async def _chat_mode_stream(user_input: str, session_id: str = "default", deep_t
     set_current_agent_id(agent_id)
     set_current_session_id(session_id)
     chat_system_prompt = _inject_current_date(_build_chat_prompt(agent_task) if agent_task else CHAT_SYSTEM_PROMPT)
-    # [性能优化] 简单问题用短回复模式：max_tokens=1024, timeout=45s, fast_mode 加速
+    # [质量修复] 不再因简单问题降级模型（fast_mode 会切换到更弱的模型）
+    # 保留 short_response 仅调整 max_tokens，但用户选择的模型不再被替换
     is_simple = _is_simple_query(user_input)
-    llm = create_llm(deep_think=deep_think, fast_mode=is_simple, short_response=is_simple)
+    llm = create_llm(deep_think=deep_think, fast_mode=False, short_response=is_simple)
     history = get_session_history(session_id)
     recent_messages = history.messages[-MAX_HISTORY_MESSAGES:]
     
@@ -990,7 +987,7 @@ async def _chat_mode_stream(user_input: str, session_id: str = "default", deep_t
             search_context = f"\n\n【联网搜索失败：{str(e)}】请根据自身知识回答。"
     
     enhanced_input = user_input + search_context
-    all_messages = recent_messages + [_get_date_message(), HumanMessage(content=enhanced_input)]
+    all_messages = recent_messages + [HumanMessage(content=enhanced_input)]
 
     full_response = ""
 
@@ -1052,7 +1049,8 @@ async def chat_stream_generator_multimodal(multimodal_content: list, session_id:
     try:
         yield {"type": "thinking", "content": f"正在分析图片（使用{use_model}）..."}
 
-        async for chunk in llm.astream([SystemMessage(content=system_prompt), _get_date_message()] + all_messages):
+        # [质量修复] 日期已通过 _inject_current_date() 注入 system_prompt 尾部
+        async for chunk in llm.astream([SystemMessage(content=system_prompt)] + all_messages):
             content = _extract_content(chunk)
             if content:
                 full_response += content

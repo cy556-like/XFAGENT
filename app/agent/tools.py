@@ -360,7 +360,7 @@ def search_documents_tool(query: str) -> str:
 
     # 按综合分数排序
     results.sort(key=lambda x: x.get("final_score", 0), reverse=True)
-    results = results[:3]  # 取 top 3（保持精简，过多结果增加上下文token拖慢LLM）
+    results = results[:5]  # [质量修复] 取 top 5（原 top 3 信息不足，增加检索量保证回答质量）
 
     output = f"【检索结果】共找到 {len(results)} 条相关内容：\n\n"
     for i, r in enumerate(results, 1):

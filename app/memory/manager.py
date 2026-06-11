@@ -39,7 +39,7 @@ MAX_MESSAGES_PER_SESSION = 200
 
 # [性能修复] 单条消息最大字符数，超过时截断
 # 工具输出（搜索结果、文档内容）可能非常长，存入历史会导致内存和序列化开销
-MAX_MESSAGE_LENGTH = 5000
+MAX_MESSAGE_LENGTH = 8000
 
 
 class FileBasedHistory(BaseChatMessageHistory):
