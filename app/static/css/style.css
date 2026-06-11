@@ -1992,7 +1992,7 @@ html { scroll-behavior: smooth; }
 }
 .login-top-bar-brand {
     color: #FFFFFF;
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 700;
     letter-spacing: 1px;
     font-family: 'Noto Serif SC', serif;
@@ -2281,7 +2281,7 @@ html { scroll-behavior: smooth; }
         padding: 0 16px;
     }
     .login-top-bar-brand {
-        font-size: 15px;
+        font-size: 19px;
     }
     .login-calligraphy {
         font-size: 28px;
