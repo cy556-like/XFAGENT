@@ -974,9 +974,9 @@ async def chat_with_file_stream(
 
         decoded_filename = unquote(file.filename)
 
-        if agent_id:
+        if store_to_kb == "true" and agent_id:
 
-            # 智能体模式：文件存到智能体专属目录
+            # 知识库模式 ON + 有 agent_id：文件存到智能体知识库目录（删对话不删除）
 
             agent_dir = os.path.join(settings.DOCUMENTS_DIR, f"agent_{agent_id}")
 
@@ -986,7 +986,7 @@ async def chat_with_file_stream(
 
         else:
 
-            # 普通模式：文件存到临时目录（不进知识库，删除会话时清理）
+            # 其他情况（普通模式 / 知识库模式OFF / 无agent_id）：文件存到临时目录，删除对话时自动清理
 
             temp_dir = os.path.join(settings.DATA_DIR, "temp", session_id)
 
