@@ -1615,6 +1615,7 @@ html { scroll-behavior: smooth; }
 .welcome-center .welcome-agent-desc { color: var(--text-secondary); font-size: 14px; line-height: 1.8; margin-bottom: 20px; max-width: 480px; margin-left: auto; margin-right: auto; }
 .welcome-center p { color: var(--text-secondary); font-size: 15px; line-height: 1.7; margin-bottom: 24px; }
 .welcome-center .quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; max-width: 520px; margin-left: auto; margin-right: auto; }
+.welcome-center .quick-actions.many-questions { grid-template-columns: repeat(4, 1fr); max-width: 680px; gap: 8px; }
 .quick-action {
     display: block;
     padding: 10px 14px;
@@ -3267,6 +3268,7 @@ html { scroll-behavior: smooth; }
     .welcome-center .welcome-agent-desc { font-size: 13px; }
     .welcome-center p { font-size: 14px; }
     .welcome-center .quick-actions { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .welcome-center .quick-actions.many-questions { grid-template-columns: repeat(3, 1fr); }
     .quick-action { padding: 8px 10px; font-size: 12px; }
     .chat-input-area { padding: 12px 12px 16px; }
     .chat-content.centered .chat-input-area { padding: 10px; }

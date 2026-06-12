@@ -60,10 +60,26 @@ const AGENT_WELCOME_CONFIG = {
         name: 'DFMEA与风险分析专家',
         desc: '引导开展设计/过程失效模式分析，关联历史失效库，自动完成风险优先级评分，并推送预防措施',
         questions: [
-            'DFMEA七步法的流程是什么？',
-            '严重度、频度、探测度怎么评级？',
-            'AP措施优先级如何判定？',
-            '如何关联历史失效案例进行风险分析？'
+            { label: 'DFMEA引导', question: '我想对电子驻车制动卡钳做DFMEA，请引导我从功能分解、失效模式识别到风险评分，并针对"制动无法释放"给出完整的失效链和现行控制措施示例。' },
+            { label: '历史失效关联推荐', question: '针对轮毂轴承单元，请根据历史售后失效数据（如微动磨损、密封失效）自动推荐应重点分析的失效模式，并说明如何将这些模式关联到DFMEA表中。' },
+            { label: '工序PFMEA', question: '在发动机水泵的PFMEA中，如何分析叶轮压装工序的潜在失效？请帮助识别关键过程特性，并以RPN方式完成评分和优先措施推荐。' },
+            { label: 'AP法风险排序', question: '我们有一份转向机DFMEA初稿，风险项过多，请帮我依据严重度、频度和探测度，用行动优先级（AP）法重新排序，并给出需改进的前三项及建议措施。' },
+            { label: '失效历史关联', question: '在设计48V BSG电机定子绕组时，如何系统识别绝缘失效模式？请关联我司历史上电机烧蚀案例库，给出预防措施和验证方法。' },
+            { label: 'PFMEA探测评分', question: '对于电动助力转向控制器的PCB焊点，请引导完成过程FMEA，重点关注冷焊和虚焊，推荐检测方式并对比AOI与X-ray的探测度评分。' },
+            { label: 'DFMEA驱动DVP关联', question: '我们正在制定DVP，请根据DFMEA中识别的高风险项，自动推导出必须包含的试验验证项目，并生成DVP与DFMEA的关联矩阵。' },
+            { label: '预防建议', question: '在整车线束设计中，如何处理"端子退针"这类失效？请根据历史失效频次，给出发生的概率评级参考值，并推送防退针结构设计建议。' },
+            { label: '电池DFMEA', question: '如何对电池包密封结构进行DFMEA？请围绕密封垫、螺栓紧固和壳体刚度，识别潜在泄漏路径，并给出设计探测措施（如气密测试）的评分。' },
+            { label: '失效库模板设计', question: '我想建立一个企业内部的失效模式-原因-措施知识库模板，请提供一个结构化字段设计，并能自动关联类似零件的历史失效记录。' },
+            { label: '风险预防推送', question: '在高强度螺栓连接的DFMEA中，"氢脆断裂"在历史库中有记录，如何评估当前设计中的残余风险，并自动推送除氢烘烤工艺参数？' },
+            { label: '频度评分建议', question: '塑料进气歧管的焊接工序PFMEA中，如何设定焊缝强度不足的频度评分？请结合历史返修数据，给出评分基准建议和过程控制措施。' },
+            { label: '功能安全DFMEA结合', question: '针对燃料电池空压机的高速转子，其失效后果影响安全，请按ISO 26262与DFMEA结合的方法，推导安全目标并确定严重度等级。' },
+            { label: '探测方法改进降险', question: '我正在评审一个齿轮箱的DFMEA，当前RPN值高于100的有5项，如何通过改进探测方法（如增加在线振动监控）来降低风险？请给出具体的评分变化推算。' },
+            { label: '供应商DFMEA审核清单', question: '如何对外购的传感器进行供应商DFMEA审核？请提供一个审核检查单，涵盖功能、环境、可靠性等失效模式评审要点。' },
+            { label: '设计准则', question: '对于ESC液压单元中的电磁阀，历史失效库显示"阀芯卡滞"比例高，如何在设计上预防，并自动生成防卡滞设计准则和试验验证建议？' },
+            { label: '风险分析推送', question: '请用DFMEA方法对电动压缩机电机转子的退磁风险进行分析，关联历史高温退磁案例，给出磁钢选型与温度保护策略的预防措施。' },
+            { label: '冗余校验', question: '在汽车线控换挡执行器的DFMEA中，如何评估"位置信号跳变"的风险？请基于冗余传感器设计给出探测度打分说明，并推送交叉校验策略。' },
+            { label: '售后数据映射频度', question: '我们想将售后索赔数据反向导入DFMEA用于频度更新，请给出一个映射规则设计，将故障率（ppm）转换为DFMEA频度等级。' },
+            { label: 'DFMEA验证报告框架', question: '在开发阶段后期，如何利用DFMEA的输出生成一份设计验证报告（DVR）的结构框架？请提供报告模板，包含风险项、验证状态和残余风险结论。' }
         ]
     },
     'part-design-agent': {
@@ -1209,8 +1225,13 @@ function updateWelcomeContent() {
         welcomeEl.innerHTML = `
             <h2 class="welcome-agent-name">${escapeHtml(config.name)}</h2>
             <p class="welcome-agent-desc">${escapeHtml(config.desc)}</p>
-            <div class="quick-actions">
-                ${config.questions.map(q => `<span class="quick-action" onclick="fillQuick(this)" data-question="${escapeHtml(q)}" role="button" tabindex="0">${escapeHtml(q)}</span>`).join('')}
+            <div class="quick-actions${config.questions.length >= 8 ? ' many-questions' : ''}">
+                ${config.questions.map(q => {
+                    if (typeof q === 'object' && q.label) {
+                        return `<span class="quick-action" onclick="fillQuick(this)" data-question="${escapeHtml(q.question)}" role="button" tabindex="0">${escapeHtml(q.label)}</span>`;
+                    }
+                    return `<span class="quick-action" onclick="fillQuick(this)" data-question="${escapeHtml(q)}" role="button" tabindex="0">${escapeHtml(q)}</span>`;
+                }).join('')}
             </div>
         `;
     } else {
