@@ -1428,6 +1428,7 @@ function updateWelcomeContent() {
                     return `<span class="quick-action" onclick="fillQuick(this)" data-question="${escapeHtml(q)}" role="button" tabindex="0">${escapeHtml(q)}</span>`;
                 }).join('')}
             </div>
+            <p class="welcome-keyword-hint">(提示词仅供参考，需根据自己工作，进行修改)</p>
         `;
     } else {
         // 默认欢迎页
