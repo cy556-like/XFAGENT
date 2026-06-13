@@ -268,6 +268,14 @@ def create_app() -> FastAPI:
     async def startup_cleanup_task():
         """启动后台定期清理任务，防止长时间运行后内存/磁盘无限增长"""
         import asyncio
+
+        # 启动时预初始化 Embedding 模型，验证 API 可用性
+        try:
+            from app.rag.document import get_embeddings, get_indexing_mode
+            get_embeddings()
+            logger.info(f"🚀 Embedding 初始化完成，索引模式: {get_indexing_mode()}")
+        except Exception as e:
+            logger.warning(f"⚠️ Embedding 预初始化异常: {e}")
         
         async def _periodic_cleanup():
             """每5分钟执行一次清理：
