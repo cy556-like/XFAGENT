@@ -688,7 +688,7 @@ function renderMyAgents() {
             <div class="agent-item-info">
                 <div class="agent-item-name">${escapeHtml(agent.name)}</div>
             </div>
-            <button class="agent-action-btn new-chat" data-action="new-chat" data-agent-id="${agent.id}" title="新建对话" aria-label="新建对话"><img src="/static/icons/new-chat.png" alt="新建对话" class="agent-new-chat-icon"></button>
+            <button class="agent-action-btn new-chat" data-action="new-chat" data-agent-id="${agent.id}" title="新建对话" aria-label="新建对话"><svg width="22" height="22" viewBox="0 0 24 24" class="agent-new-chat-icon"><rect x="1" y="1" width="22" height="22" rx="6" ry="6" fill="#C62828"/><path d="M9.5 6.5L18.5 12L9.5 17.5Z" fill="white"/></svg></button>
         `;
         list.appendChild(item);
     });
