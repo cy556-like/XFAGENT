@@ -2457,8 +2457,9 @@ async function uploadToKnowledgeBase(file) {
     const barFill = document.getElementById('progressBarFill');
     const statusEl = document.getElementById('progressStatus');
     progressEl.style.display = 'block';
+    const isImage = file.type && file.type.startsWith('image/');
     const kbLabel = currentAgentId ? `智能体「${myAgents.find(a => a.id === currentAgentId)?.name || ''}」知识库` : '知识库';
-    fileNameEl.textContent = `📎 ${file.name} → ${kbLabel}`;
+    fileNameEl.textContent = `${isImage ? '🖼️' : '📎'} ${file.name} → ${kbLabel}${isImage ? '（VLM解析中）' : ''}`;
     barFill.style.width = '10%';
     statusEl.textContent = '上传中...';
     statusEl.className = 'progress-status';
@@ -2889,9 +2890,10 @@ async function uploadToKbPage(file) {
     const barFill = document.getElementById('kbProgressBarFill');
     const statusEl = document.getElementById('kbProgressStatus');
     progressEl.style.display = 'block';
+    const isImage = file.type && file.type.startsWith('image/');
     const agent = myAgents.find(a => a.id === currentAgentId);
     const kbLabel = agent ? agent.name + ' 知识库' : '知识库';
-    fileNameEl.textContent = file.name + ' → ' + kbLabel;
+    fileNameEl.textContent = (isImage ? '🖼️ ' : '') + file.name + ' → ' + kbLabel + (isImage ? '（VLM解析中）' : '');
     barFill.style.width = '10%';
     statusEl.textContent = '上传中...';
     statusEl.className = 'kb-progress-status';
