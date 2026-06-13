@@ -878,7 +878,12 @@ async def chat_stream_generator(user_input: str, session_id: str = "default", we
 
             kind = event["event"]
 
-            if kind == "on_chat_model_stream":
+            if kind == "on_chat_model_start":
+                # LLM 开始生成：发送思考进度反馈
+                # 在多轮工具调用场景中，每轮 think 开始都会触发此事件
+                yield {"type": "thinking", "content": "正在思考..."}
+
+            elif kind == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
                 content = _extract_content(chunk)
                 if content:

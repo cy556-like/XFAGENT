@@ -19,8 +19,9 @@ from functools import wraps
 
 from langchain_core.tools import tool
 
+import asyncio
 from app.config import settings
-from app.rag.document import search_documents, index_document, list_indexed_documents, delete_document, update_document, export_document_as_docx, export_document_as_xlsx, get_document_content
+from app.rag.document import search_documents, search_documents_async, index_document, list_indexed_documents, delete_document, update_document, export_document_as_docx, export_document_as_xlsx, get_document_content
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +149,7 @@ def get_search_count() -> int:
 
 
 def cached_tool(ttl: int = 300, include_agent_id: bool = True):
-    """工具缓存装饰器
+    """工具缓存装饰器（同步版）
     
     Args:
         ttl: 缓存有效期（秒），web_search 默认 5 分钟，文档搜索默认 2 分钟
@@ -159,8 +160,6 @@ def cached_tool(ttl: int = 300, include_agent_id: bool = True):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # 关键修复：将 agent_id 纳入缓存 key，避免不同智能体共享缓存结果
-            # 例如：智能体A搜索"FMEA"和智能体B搜索"FMEA"应返回不同的结果
             agent_id_for_cache = get_current_agent_id() if include_agent_id else ""
             cache_key = _tool_cache._make_key(func.__name__, args, kwargs, agent_id=agent_id_for_cache)
             cached = _tool_cache.get(cache_key)
@@ -168,7 +167,35 @@ def cached_tool(ttl: int = 300, include_agent_id: bool = True):
                 logger.info(f"工具缓存命中: {func.__name__} (agent_id={agent_id_for_cache})")
                 return cached
             result = func(*args, **kwargs)
-            # 【修复】错误结果不缓存：避免一次失败导致2分钟内所有搜索都返回同一错误
+            if isinstance(result, str) and result.startswith("【检索失败】"):
+                logger.warning(f"工具返回错误，不缓存: {func.__name__} -> {result[:100]}")
+                return result
+            _tool_cache.set(cache_key, result, ttl=ttl)
+            return result
+        return wrapper
+    return decorator
+
+
+def cached_tool_async(ttl: int = 300, include_agent_id: bool = True):
+    """工具缓存装饰器（异步版）
+    
+    与 cached_tool 功能相同，但支持异步函数。
+    缓存命中时直接返回，未命中时 await 异步函数获取结果。
+    
+    Args:
+        ttl: 缓存有效期（秒）
+        include_agent_id: 是否将 agent_id 纳入缓存 key
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            agent_id_for_cache = get_current_agent_id() if include_agent_id else ""
+            cache_key = _tool_cache._make_key(func.__name__, args, kwargs, agent_id=agent_id_for_cache)
+            cached = _tool_cache.get(cache_key)
+            if cached is not None:
+                logger.info(f"工具缓存命中(异步): {func.__name__} (agent_id={agent_id_for_cache})")
+                return cached
+            result = await func(*args, **kwargs)
             if isinstance(result, str) and result.startswith("【检索失败】"):
                 logger.warning(f"工具返回错误，不缓存: {func.__name__} -> {result[:100]}")
                 return result
@@ -300,8 +327,8 @@ def _load_employees():
 
 
 @tool
-@cached_tool(ttl=300)  # [#8] 文档搜索缓存 5 分钟（与web_search一致，减少同会话重复搜索）
-def search_documents_tool(query: str) -> str:
+@cached_tool_async(ttl=300)  # [#8] 异步文档搜索缓存 5 分钟
+async def search_documents_tool(query: str) -> str:
     """搜索公司文档知识库，检索与查询语义相关的文档片段。
 
     [#9] 采用混合检索策略：向量语义检索 + 关键词匹配，提升检索准确率
@@ -314,11 +341,8 @@ def search_documents_tool(query: str) -> str:
         query: 搜索查询关键词。
                示例：「年假制度」「报销流程」「考勤规定」
     """
-    # [#9] 混合检索：先向量搜索，再用关键词补充
-    # 按 agent_id 隔离知识库：智能体只搜索自己的知识库
-    # 普通聊天模式（agent_id=None）没有知识库
     current_aid = get_current_agent_id()
-    logger.debug(f"搜索文档: query={query}, agent_id={current_aid}")
+    logger.debug(f"搜索文档(异步): query={query}, agent_id={current_aid}")
 
     # 普通聊天模式没有知识库
     if not current_aid:
@@ -331,16 +355,17 @@ def search_documents_tool(query: str) -> str:
         return f"【检索提示】已搜索{current_count-1}次，请直接基于已有结果回答，不要再搜索。"
     
     try:
-        results = search_documents(query, top_k=8, agent_id=current_aid)  # 保持8，过多结果增加上下文长度拖慢LLM
+        # [性能优化] 使用异步并行搜索替代同步串行搜索
+        results = await search_documents_async(query, top_k=8, agent_id=current_aid)
     except Exception as e:
         error_str = str(e)
-        logger.error(f"search_documents 异常: {error_str}", exc_info=True)
+        logger.error(f"search_documents_async 异常: {error_str}", exc_info=True)
         if '429' in error_str or '余额' in error_str or '1113' in error_str:
             return f"【检索失败】Embedding API 余额不足（429错误），向量搜索不可用。建议用户充值智谱API余额。当前仅使用关键词检索，结果可能不完整。如需获取完整文档内容，请使用 get_document_content_tool 工具。"
-        # 【修复】最后兜底：尝试磁盘文件搜索，而不是直接报错
+        # 兜底：尝试磁盘文件搜索
         try:
             from app.rag.document import _search_disk_files
-            fallback_results = _search_disk_files(query, top_k=5, agent_id=current_aid)
+            fallback_results = await asyncio.to_thread(_search_disk_files, query, top_k=5, agent_id=current_aid)
             if fallback_results:
                 results = fallback_results
             else:
