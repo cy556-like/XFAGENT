@@ -688,7 +688,7 @@ function renderMyAgents() {
             <div class="agent-item-info">
                 <div class="agent-item-name">${escapeHtml(agent.name)}</div>
             </div>
-            <button class="agent-action-btn new-chat" data-action="new-chat" data-agent-id="${agent.id}" title="新建对话" aria-label="新建对话">➕</button>
+            <button class="agent-action-btn new-chat" data-action="new-chat" data-agent-id="${agent.id}" title="新建对话" aria-label="新建对话"><img src="/static/icons/new-chat.png" alt="新建对话" class="agent-new-chat-icon"></button>
         `;
         list.appendChild(item);
     });
