@@ -29,7 +29,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from app.config import settings, VISION_MODELS, DEFAULT_VISION_MODEL, FAST_MODELS, DEEPSEEK_MODELS, VOLCENGINE_MODELS, QWEN_MODELS, MIMO_MODELS
+from app.config import settings, VISION_MODELS, DEFAULT_VISION_MODEL, VISION_API_KEY, VISION_BASE_URL, FAST_MODELS, DEEPSEEK_MODELS, VOLCENGINE_MODELS, QWEN_MODELS, MIMO_MODELS
 from app.agent.tools import ALL_TOOLS, get_tools, set_current_agent_id, set_current_session_id, get_current_session_id, reset_search_count
 from app.agent.prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_WITH_WEB_SEARCH, CHAT_SYSTEM_PROMPT
 from app.memory.manager import get_session_history
@@ -252,6 +252,11 @@ def create_llm(deep_think: bool = False, fast_mode: bool = False, model_override
         api_key = settings.MIMO_API_KEY
         base_url = settings.MIMO_BASE_URL
         logger.info(f"MiMo模型检测到（{model}），使用小米MiMo API: {base_url}")
+    # [视觉模型] 无论当前选什么模型，视觉理解始终走智谱AI专用配置
+    elif model in VISION_MODELS:
+        api_key = VISION_API_KEY
+        base_url = VISION_BASE_URL
+        logger.info(f"视觉模型检测到（{model}），使用智谱AI视觉专用API: {base_url}")
     else:
         api_key = settings.LLM_API_KEY_BACKUP if use_backup else settings.LLM_API_KEY
         base_url = settings.LLM_BASE_URL_BACKUP if use_backup else settings.LLM_BASE_URL
