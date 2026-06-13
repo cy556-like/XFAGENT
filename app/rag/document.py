@@ -419,11 +419,6 @@ def get_embeddings():
             embedding_api_key = getattr(settings, 'EMBEDDING_API_KEY', '') or settings.LLM_API_KEY
             embedding_base_url = getattr(settings, 'EMBEDDING_BASE_URL', '') or settings.LLM_BASE_URL
 
-            # [诊断] 打印实际使用的 Embedding 配置（Key 脱敏）
-            _ek = (embedding_api_key[:8] + '***' + embedding_api_key[-4:]) if len(embedding_api_key) > 12 else '***'
-            logger.info(f"[EMBED DIAG] model={embedding_model}, api_key={_ek}, base_url={embedding_base_url}")
-            print(f"[EMBED DIAG] model={embedding_model}, api_key={_ek}, base_url={embedding_base_url}")
-
             _embeddings_instance = OpenAIEmbeddings(
                 api_key=embedding_api_key,
                 base_url=embedding_base_url,
@@ -431,14 +426,12 @@ def get_embeddings():
                 request_timeout=15,  # 超时保护：15秒，避免初始化卡死整个服务
             )
 
-            # [诊断] 首次初始化时发一个测试请求验证 Embedding API 可用
+            # 首次初始化时发测试请求验证 Embedding API 可用，避免静默降级
             try:
                 _test_vec = _embeddings_instance.embed_query("测试")
-                logger.info(f"[EMBED DIAG] 测试请求成功，向量维度={len(_test_vec)}")
-                print(f"[EMBED DIAG] ✅ 测试请求成功，向量维度={len(_test_vec)}")
+                logger.info(f"Embedding API 验证成功，向量维度={len(_test_vec)}")
             except Exception as test_err:
-                logger.error(f"[EMBED DIAG] ❌ 测试请求失败: {test_err}")
-                print(f"[EMBED DIAG] ❌ 测试请求失败: {test_err}")
+                logger.error(f"Embedding API 验证失败: {test_err}")
                 raise  # 向上抛出，触发降级逻辑
 
             _embeddings_instance._created_at = time.time()  # [v8] 记录创建时间用于 TTL 检查

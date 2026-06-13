@@ -11,13 +11,9 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-# [诊断] 显式指定 .env 路径，确保从项目根目录加载
+# 显式指定 .env 路径（项目根目录），避免 uvicorn 启动目录不是项目根时找不到 .env
 _env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
-_env_loaded = load_dotenv(_env_path)
-if _env_loaded:
-    print(f"[CONFIG] ✅ .env 已加载: {_env_path}")
-else:
-    print(f"[CONFIG] ⚠️ .env 未找到，尝试默认路径: {_env_path}")
+if not load_dotenv(_env_path):
     load_dotenv()  # 回退：尝试从 cwd 加载
 
 # 可用的 LLM 模型列表
@@ -119,15 +115,6 @@ class Settings:
 
 
 settings = Settings()
-
-# [诊断] 启动时打印 Embedding 配置，方便排查问题
-_mask = lambda k: (k[:8] + '***' + k[-4:]) if len(k) > 12 else '***'
-print(f"[CONFIG] EMBEDDING_MODEL    = {settings.EMBEDDING_MODEL}")
-print(f"[CONFIG] EMBEDDING_API_KEY  = {_mask(settings.EMBEDDING_API_KEY)}")
-print(f"[CONFIG] EMBEDDING_BASE_URL = {settings.EMBEDDING_BASE_URL}")
-print(f"[CONFIG] LLM_MODEL          = {settings.LLM_MODEL}")
-print(f"[CONFIG] LLM_API_KEY        = {_mask(settings.LLM_API_KEY)}")
-print(f"[CONFIG] LLM_BASE_URL       = {settings.LLM_BASE_URL}")
 
 
 def set_current_model(model_id: str) -> bool:
