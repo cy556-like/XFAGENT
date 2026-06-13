@@ -1619,11 +1619,13 @@ html { scroll-behavior: smooth; }
 .welcome-center .welcome-agent-name { font-size: 26px; margin-bottom: 6px; color: var(--accent, #D4A843); font-weight: 700; }
 .welcome-center .welcome-agent-desc { color: var(--text-secondary); font-size: 14px; line-height: 1.8; margin-bottom: 20px; max-width: 480px; margin-left: auto; margin-right: auto; }
 .welcome-center p { color: var(--text-secondary); font-size: 15px; line-height: 1.7; margin-bottom: 24px; }
-.welcome-center .quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; max-width: 520px; margin-left: auto; margin-right: auto; }
-.welcome-center .quick-actions.many-questions { grid-template-columns: repeat(4, 1fr); max-width: 680px; gap: 8px; }
+.welcome-center .quick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; max-width: 720px; margin-left: auto; margin-right: auto; }
+.welcome-center .quick-actions.many-questions { max-width: 720px; gap: 8px; }
 .quick-action {
-    display: block;
-    padding: 10px 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
     background: var(--bg-input, #fff);
     border: 1px solid var(--border, #e5e5e5);
     border-radius: 10px;
@@ -1631,11 +1633,13 @@ html { scroll-behavior: smooth; }
     cursor: pointer;
     font-size: 13px;
     font-weight: 400;
-    text-align: left;
+    text-align: center;
     line-height: 1.5;
     transition: all 0.15s;
-    white-space: normal;
-    word-break: break-all;
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: calc(20% - 7px);
+    min-width: auto;
 }
 .quick-action:hover { color: var(--accent, #D4A843); border-color: var(--accent, #D4A843); background: rgba(212,168,67,0.06); transform: translateY(-1px); }
 
@@ -3272,8 +3276,8 @@ html { scroll-behavior: smooth; }
     .welcome-center .welcome-agent-name { font-size: 20px; }
     .welcome-center .welcome-agent-desc { font-size: 13px; }
     .welcome-center p { font-size: 14px; }
-    .welcome-center .quick-actions { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .welcome-center .quick-actions.many-questions { grid-template-columns: repeat(3, 1fr); }
+    .welcome-center .quick-actions { gap: 6px; }
+    .welcome-center .quick-actions.many-questions { max-width: 100%; }
     .quick-action { padding: 8px 10px; font-size: 12px; }
     .chat-input-area { padding: 12px 12px 16px; }
     .chat-content.centered .chat-input-area { padding: 10px; }
