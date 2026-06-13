@@ -1178,11 +1178,11 @@ def load_xlsx_document(file_path: str) -> list:
 def _load_image_as_document(file_path: str) -> list:
     """使用视觉模型(VLM)解析图片文件，提取文字内容后转为文档对象
 
-    通过调用 glm-4v-plus 视觉模型，对图片进行详细的OCR和内容描述，
+    通过调用 glm-4v-flash 视觉模型，对图片进行详细的OCR和内容描述，
     将提取的文字作为文档内容索引到知识库。
     支持 PNG/JPG/JPEG/GIF/BMP/WebP 格式。
 
-    原理：图片 → base64 → VLM(glm-4v-plus) → 提取文字 → Document对象
+    原理：图片 → base64 → VLM(glm-4v-flash) → 提取文字 → Document对象
     VLM 仅在索引阶段调用一次，后续检索走普通文本检索链路，无需再次调用VLM。
     """
     import base64
@@ -1191,7 +1191,7 @@ def _load_image_as_document(file_path: str) -> list:
         from langchain_openai import ChatOpenAI
     except ImportError:
         from langchain_community.chat_models import ChatOpenAI
-    from app.config import settings, DEFAULT_VISION_MODEL
+    from app.config import settings, DEFAULT_VISION_MODEL, VISION_API_KEY, VISION_BASE_URL
 
     ext = os.path.splitext(file_path)[1].lower()
     mime_map = {
@@ -1218,8 +1218,8 @@ def _load_image_as_document(file_path: str) -> list:
     try:
         llm = ChatOpenAI(
             model=DEFAULT_VISION_MODEL,
-            api_key=settings.LLM_API_KEY,
-            base_url=settings.LLM_BASE_URL,
+            api_key=VISION_API_KEY,
+            base_url=VISION_BASE_URL,
             temperature=0.1,
             max_tokens=4096,
             request_timeout=120,
