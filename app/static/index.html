@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260613u">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260614b">
 </head>
 <body>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebarMobile()"></div>
@@ -89,7 +89,7 @@
             </div>
             <div class="header-actions">
                 <select class="model-select" id="modelSelect" onchange="switchModel()" title="切换模型" aria-label="选择模型"></select>
-                <div class="export-wrapper"><button class="header-btn" onclick="toggleExportDropdown()" title="导出对话" aria-label="导出对话" aria-haspopup="true">📥 导出</button><div class="export-dropdown" id="exportDropdown" role="menu"><button onclick="exportChat('md')" role="menuitem">📝 Markdown</button><button onclick="exportChat('pdf')" role="menuitem">📄 PDF</button></div></div>
+                <div class="export-wrapper"><button class="header-btn" onclick="toggleExportDropdown()" title="导出对话" aria-label="导出对话" aria-haspopup="true">📥 导出对话</button><div class="export-dropdown" id="exportDropdown" role="menu"><button onclick="exportChat('docx')" role="menuitem">📝 Word</button><button onclick="exportChat('pdf')" role="menuitem">📄 PDF</button><button onclick="exportChat('md')" role="menuitem">📋 Markdown</button></div></div>
 
             </div>
         </header>
@@ -202,6 +202,6 @@ function toggleFaq(el) {
     if (!isActive) el.classList.add('active');
 }
 </script>
-<script src="/static/js/app.js?v=20260613u"></script>
+<script src="/static/js/app.js?v=20260614b"></script>
 </body>
 </html>

@@ -17,7 +17,9 @@ CHINESE_FONT_PATHS = {
         "C:/Windows/Fonts/simhei.ttf",
     ],
     "Linux": [
+        "/usr/share/fonts/truetype/chinese/SarasaMonoSC-Regular.ttf",
         "/usr/share/fonts/truetype/chinese/NotoSansSC-Regular.ttf",
+        "/usr/share/fonts/truetype/chinese/NotoSansSC[wght].ttf",
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     ],
     "Darwin": [

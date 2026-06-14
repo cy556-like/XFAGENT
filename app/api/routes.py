@@ -2461,9 +2461,9 @@ async def export_chat(session_id: str, format: str = "md"):
 
     """
 
-    导出对话为 Markdown 或 PDF 格式
+    导出对话为 Word(docx)、PDF 或 Markdown 格式
 
-    format: md | pdf
+    format: docx | pdf | md
 
     """
 
@@ -2475,7 +2475,111 @@ async def export_chat(session_id: str, format: str = "md"):
 
 
 
-    if format == "pdf":
+    if format == "docx":
+
+        # Word (docx) 导出
+
+        try:
+
+            from docx import Document
+
+            from docx.shared import Pt, Inches, RGBColor
+
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+            doc = Document()
+
+            # 标题
+
+            title_para = doc.add_heading("DocAgent 对话记录", level=1)
+
+            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            # 会话信息
+
+            info_para = doc.add_paragraph()
+
+            info_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            info_run = info_para.add_run(f"Session: {session_id[:12]}")
+
+            info_run.font.size = Pt(9)
+
+            info_run.font.color.rgb = RGBColor(128, 128, 128)
+
+            doc.add_paragraph()  # 空行
+
+
+
+            for msg in messages:
+
+                role = "用户" if msg["role"] == "user" else "助手"
+
+                content = msg.get("content", "")
+
+                # 角色标签
+
+                role_para = doc.add_paragraph()
+
+                role_run = role_para.add_run(f"{role}：")
+
+                role_run.bold = True
+
+                role_run.font.size = Pt(11)
+
+                if msg["role"] == "user":
+
+                    role_run.font.color.rgb = RGBColor(33, 33, 33)
+
+                else:
+
+                    role_run.font.color.rgb = RGBColor(25, 118, 210)
+
+                # 内容
+
+                content_para = doc.add_paragraph()
+
+                content_run = content_para.add_run(content)
+
+                content_run.font.size = Pt(10)
+
+                # 添加分隔线
+
+                doc.add_paragraph("─" * 40)
+
+
+
+            # 输出为 bytes
+
+            from io import BytesIO
+
+            buffer = BytesIO()
+
+            doc.save(buffer)
+
+            buffer.seek(0)
+
+            return Response(
+
+                content=buffer.read(),
+
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+                headers={
+
+                    "Content-Disposition": f"attachment; filename=chat_{session_id[:12]}.docx"
+
+                }
+
+            )
+
+        except Exception as e:
+
+            raise HTTPException(status_code=500, detail=f"Word 生成失败: {str(e)}")
+
+
+
+    elif format == "pdf":
 
         # PDF 导出
 

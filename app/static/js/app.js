@@ -2540,11 +2540,13 @@ async function exportChat(format) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const ext = format === 'pdf' ? 'pdf' : 'md';
+        const extMap = { docx: 'docx', pdf: 'pdf', md: 'md' };
+        const nameMap = { docx: 'Word', pdf: 'PDF', md: 'Markdown' };
+        const ext = extMap[format] || 'md';
         a.download = `chat_${currentChatId.slice(0, 12)}.${ext}`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast(`已导出为 ${format.toUpperCase()}`);
+        showToast(`已导出为 ${nameMap[format] || format.toUpperCase()}`);
     } catch (e) {
         showToast('导出失败');
     }
