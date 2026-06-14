@@ -2466,13 +2466,14 @@ async def update_config(req: ConfigUpdateRequest, username: str = Depends(requir
 
 @router.get("/export/{session_id}", summary="导出对话")
 
-async def export_chat(session_id: str, format: str = "md"):
+async def export_chat(session_id: str, format: str = "md", agent_name: str = ""):
 
     """
 
     导出对话为 Word(docx)、PDF 或 Markdown 格式
 
     format: docx | pdf | md
+    agent_name: 当前智能体名称（用于文件名和标题）
 
     """
 
@@ -2502,7 +2503,9 @@ async def export_chat(session_id: str, format: str = "md"):
 
             # 标题
 
-            title_para = doc.add_heading("东风科技研发智能体 对话记录", level=1)
+            display_title = f"{agent_name} 对话记录" if agent_name else "东风科技研发智能体 对话记录"
+
+            title_para = doc.add_heading(display_title, level=1)
 
             title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
@@ -2570,6 +2573,16 @@ async def export_chat(session_id: str, format: str = "md"):
 
             buffer.seek(0)
 
+            # 安全文件名
+
+            from urllib.parse import quote
+
+            safe_name = agent_name.replace('/', '_').replace('\\', '_').replace('..', '_') if agent_name else f'chat_{session_id[:12]}'
+
+            filename = f"{safe_name}_对话记录.docx"
+
+            encoded_filename = quote(filename)
+
             return Response(
 
                 content=buffer.read(),
@@ -2578,7 +2591,7 @@ async def export_chat(session_id: str, format: str = "md"):
 
                 headers={
 
-                    "Content-Disposition": f"attachment; filename=chat_{session_id[:12]}.docx"
+                    "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
 
                 }
 
@@ -2598,7 +2611,13 @@ async def export_chat(session_id: str, format: str = "md"):
 
             from app.utils.pdf_generator import generate_chat_pdf
 
-            pdf_bytes = generate_chat_pdf(messages, session_id)
+            pdf_bytes = generate_chat_pdf(messages, session_id, agent_name=agent_name)
+
+            # 安全文件名
+            from urllib.parse import quote
+            safe_name = agent_name.replace('/', '_').replace('\\', '_').replace('..', '_') if agent_name else f'chat_{session_id[:12]}'
+            filename = f"{safe_name}_对话记录.pdf"
+            encoded_filename = quote(filename)
 
             return Response(
 
@@ -2608,7 +2627,7 @@ async def export_chat(session_id: str, format: str = "md"):
 
                 headers={
 
-                    "Content-Disposition": f"attachment; filename=chat_{session_id[:12]}.pdf"
+                    "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
 
                 }
 
@@ -2621,8 +2640,8 @@ async def export_chat(session_id: str, format: str = "md"):
     else:
 
         # Markdown 导出
-
-        content = ""
+        display_title = f"{agent_name} 对话记录" if agent_name else "东风科技研发智能体 对话记录"
+        content = f"# {display_title}\n\n"
 
         for msg in messages:
 
@@ -2632,6 +2651,12 @@ async def export_chat(session_id: str, format: str = "md"):
 
 
 
+        # 安全文件名
+        from urllib.parse import quote
+        safe_name = agent_name.replace('/', '_').replace('\\', '_').replace('..', '_') if agent_name else f'chat_{session_id[:12]}'
+        md_filename = f"{safe_name}_对话记录.md"
+        encoded_md_filename = quote(md_filename)
+
         return Response(
 
             content=content.encode("utf-8"),
@@ -2640,7 +2665,7 @@ async def export_chat(session_id: str, format: str = "md"):
 
             headers={
 
-                "Content-Disposition": f"attachment; filename=chat_{session_id[:12]}.md"
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_md_filename}"
 
             }
 

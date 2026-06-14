@@ -168,13 +168,14 @@ def _generate_pdf_fpdf(text, output_path, title="修改后的文档"):
     return True, output_path
 
 
-def generate_chat_pdf(messages: list, session_id: str) -> bytes:
+def generate_chat_pdf(messages: list, session_id: str, agent_name: str = "") -> bytes:
     """
     生成对话导出 PDF（返回 bytes），使用 reportlab
 
     Args:
         messages: 对话消息列表 [{"role": "user"/"assistant", "content": "..."}]
         session_id: 会话 ID
+        agent_name: 当前智能体名称（用于标题）
 
     Returns:
         PDF 文件的 bytes 内容
@@ -222,7 +223,8 @@ def generate_chat_pdf(messages: list, session_id: str) -> bytes:
 
     story = []
     # 标题
-    story.append(Paragraph("东风科技研发智能体 对话记录", title_style))
+    display_title = f"{agent_name} 对话记录" if agent_name else "东风科技研发智能体 对话记录"
+    story.append(Paragraph(display_title, title_style))
     story.append(Paragraph(f"Session: {session_id[:12]}", info_style))
 
     for msg in messages:

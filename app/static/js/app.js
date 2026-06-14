@@ -2570,8 +2570,17 @@ async function exportChat(format) {
     const dropdown = document.getElementById('exportDropdown');
     if (dropdown) dropdown.classList.remove('show');
 
+    // 获取当前智能体名称，用于文件名
+    let agentName = '';
+    if (currentAgentId) {
+        const agent = myAgents.find(a => a.id === currentAgentId);
+        if (agent) agentName = agent.name;
+    }
+
     try {
-        const resp = await fetch(`/api/v1/export/${currentChatId}?format=${format}`, { headers: apiHeaders() });
+        const params = new URLSearchParams({ format });
+        if (agentName) params.set('agent_name', agentName);
+        const resp = await fetch(`/api/v1/export/${currentChatId}?${params.toString()}`, { headers: apiHeaders() });
         if (!resp.ok) { showToast('导出失败'); return; }
 
         const blob = await resp.blob();
@@ -2581,7 +2590,9 @@ async function exportChat(format) {
         const extMap = { docx: 'docx', pdf: 'pdf', md: 'md' };
         const nameMap = { docx: 'Word', pdf: 'PDF', md: 'Markdown' };
         const ext = extMap[format] || 'md';
-        a.download = `chat_${currentChatId.slice(0, 12)}.${ext}`;
+        // 文件名包含智能体名称
+        const safeName = agentName ? agentName.replace(/[\\/:*?"<>|]/g, '_') : 'chat';
+        a.download = `${safeName}_对话记录.${ext}`;
         a.click();
         URL.revokeObjectURL(url);
         showToast(`已导出为 ${nameMap[format] || format.toUpperCase()}`);
