@@ -285,18 +285,39 @@ def _save_user_chats(username: str, chats: list[dict]) -> None:
         json.dump(chats, f, ensure_ascii=False, indent=2)
 
 
+# 每个智能体最多保留的历史对话数量
+MAX_CHATS_PER_AGENT = 5
+
+
 def create_chat(username: str, title: str = "新对话", mode: str = "agent", agent_id: str = None) -> dict:
     """
     为用户创建一个新的会话
 
     Args:
         mode: 会话模式 "agent" 或 "chat"，用于隔离不同模式的对话列表
+        agent_id: 智能体ID，会话归属到指定智能体
 
     Returns:
         dict: 包含 chat_id、title 和 mode
+
+    当同一智能体下的会话数超过 MAX_CHATS_PER_AGENT 时，自动删除最老的会话
     """
     chat_id = f"{username}_{uuid.uuid4().hex[:8]}"
     chats = _load_user_chats(username)
+
+    # 自动淘汰：如果指定了 agent_id，检查该智能体下已有会话数
+    if agent_id:
+        agent_chats = [c for c in chats if c.get("agent_id") == agent_id]
+        if len(agent_chats) >= MAX_CHATS_PER_AGENT:
+            # 按 updated_at 升序排列，最老的在前面
+            agent_chats_sorted = sorted(agent_chats, key=lambda x: x.get("updated_at", 0))
+            to_remove_count = len(agent_chats) - MAX_CHATS_PER_AGENT + 1  # +1 因为还要新建一个
+            for old_chat in agent_chats_sorted[:to_remove_count]:
+                old_chat_id = old_chat["chat_id"]
+                chats = [c for c in chats if c["chat_id"] != old_chat_id]
+                # 同时清理对话历史文件和内存缓存
+                clear_session_history(old_chat_id)
+                logger.info(f"智能体 [{agent_id}] 会话数达上限({MAX_CHATS_PER_AGENT})，自动淘汰旧会话: {old_chat_id}")
 
     chat_info = {
         "chat_id": chat_id,
