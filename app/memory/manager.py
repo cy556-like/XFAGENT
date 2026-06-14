@@ -199,9 +199,15 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
     
     _session_store[session_id] = (history, time.time())
     
-    # LRU淘汰：超过上限时移除最久未访问的
+    # LRU淘汰：超过上限时移除最久未访问的（先flush防止数据丢失）
     while len(_session_store) > MAX_SESSION_STORE_SIZE:
-        oldest_id, _ = _session_store.popitem(last=False)
+        oldest_id, (oldest_history, _) = _session_store.popitem(last=False)
+        # [BUG FIX] 淘汰前先flush，防止防抖写入中的数据丢失
+        if hasattr(oldest_history, 'flush'):
+            try:
+                oldest_history.flush()
+            except Exception:
+                pass
         logger.debug(f"LRU淘汰会话: {oldest_id}（内存释放，文件保留）")
     
     return history
@@ -215,14 +221,65 @@ def clear_session_history(session_id: str) -> None:
         del _session_store[session_id]
 
 
+def flush_session(session_id: str) -> None:
+    """强制将指定会话的待写入数据刷到磁盘（导出前调用，确保数据一致性）"""
+    if session_id in _session_store:
+        history, _ = _session_store[session_id]
+        if hasattr(history, 'flush'):
+            try:
+                history.flush()
+                logger.debug(f"会话 {session_id} 已flush到磁盘")
+            except Exception as e:
+                logger.warning(f"会话 {session_id} flush失败: {e}")
+
+
 def get_history_messages(session_id: str) -> list[dict]:
-    """获取会话历史的格式化版本（用于 API 返回）"""
+    """获取会话历史的格式化版本（用于 API 返回）
+    
+    优先从内存读取（快），如果内存中没有则从文件加载。
+    """
     history = get_session_history(session_id)
     messages = []
     for msg in history.messages:
         role = "user" if isinstance(msg, HumanMessage) else "assistant"
-        messages.append({"role": role, "content": msg.content})
+        content = msg.content if isinstance(msg.content, str) else str(msg.content)
+        messages.append({"role": role, "content": content})
     return messages
+
+
+def get_history_messages_from_file(session_id: str) -> list[dict]:
+    """强制从文件读取会话历史（导出时使用，确保跨worker数据一致性）
+    
+    与 get_history_messages 不同，此函数：
+    1. 先flush当前worker的内存缓存到磁盘
+    2. 直接从文件重新加载，不使用内存缓存
+    3. 确保导出时读到的是最新的持久化数据
+    """
+    # 先flush当前worker的缓存
+    flush_session(session_id)
+    
+    # 直接从文件重新加载
+    file_path = os.path.join(settings.DATA_DIR, "conversations", f"{session_id}.json")
+    if not os.path.exists(file_path):
+        logger.warning(f"导出时未找到会话文件: {file_path}")
+        return []
+    
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        messages = []
+        for msg_data in data:
+            role = msg_data.get("role", "assistant")
+            content = msg_data.get("content", "")
+            if not isinstance(content, str):
+                content = str(content)
+            messages.append({"role": role, "content": content})
+        logger.info(f"从文件读取会话 {session_id}: {len(messages)} 条消息")
+        return messages
+    except Exception as e:
+        logger.error(f"从文件读取会话 {session_id} 失败: {e}")
+        # 降级：使用内存缓存
+        return get_history_messages(session_id)
 
 
 def cleanup_idle_sessions() -> int:

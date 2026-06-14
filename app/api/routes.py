@@ -130,6 +130,14 @@ async def _sse_stream_wrapper(generator_factory, request: Request, session_id: s
             update_chat_time(parts[0], session_id)
     except Exception:
         pass
+
+    # [BUG FIX] 流结束后立即flush，确保对话数据写入磁盘
+    # 避免多worker进程下导出时读到过时数据
+    try:
+        flush_session(session_id)
+    except Exception:
+        pass
+
     _record_request(endpoint, time.time() - start_time)
     if cancelled_by_client:
         logger.info(f"SSE流完成（客户端主动断开）: session={session_id}")
@@ -142,7 +150,8 @@ from app.auth.jwt_handler import create_token, verify_token, get_username_from_t
 
 from app.memory.manager import (
 
-    get_history_messages, clear_session_history,
+    get_history_messages, get_history_messages_from_file, clear_session_history,
+    flush_session,
 
     create_chat, list_chats, delete_chat, rename_chat, update_chat_time,
 
@@ -2467,7 +2476,9 @@ async def export_chat(session_id: str, format: str = "md"):
 
     """
 
-    messages = get_history_messages(session_id)
+    # [BUG FIX] 使用 get_history_messages_from_file 强制从文件读取最新数据
+    # 避免多worker进程下内存缓存不一致导致导出内容错误
+    messages = get_history_messages_from_file(session_id)
 
     if not messages:
 
