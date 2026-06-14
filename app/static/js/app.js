@@ -1319,7 +1319,7 @@ function doLogout() {
     document.getElementById('loginPass').value = '';
     updateHeaderKbVisibility();
     // [BUG FIX] Update history state so back button is consistent
-    if (history.state && history.state.page === 'chat') {
+    if (history.state && (history.state.page === 'chat' || history.state.page === 'kb')) {
         history.replaceState({page: 'login'}, '');
     }
 }
@@ -1330,14 +1330,33 @@ function doLogout() {
 window.addEventListener('popstate', function(e) {
     const loginModal = document.getElementById('loginModal');
     const chatPage = document.getElementById('chatPage');
+    const kbPage = document.getElementById('kbPage');
+    const chatContent = document.getElementById('chatContent');
+    const sidebar = document.getElementById('sidebar');
+
     if (e.state && e.state.page === 'chat') {
-        // Forward to chat - only if still authenticated
+        // 回到聊天页 - 从知识库页返回 或 从登录页前进
         if (currentUser && authToken) {
             loginModal.classList.remove('show');
             chatPage.style.display = 'flex';
             document.body.classList.add('body-chat-mode');
+            // [BUG FIX] 如果从知识库返回，关闭知识库页，恢复聊天页
+            if (kbPage) kbPage.style.display = 'none';
+            if (chatContent) chatContent.style.display = 'flex';
+            if (sidebar) sidebar.style.display = '';
         } else {
             // Not authenticated anymore, go back to login
+            history.replaceState({page: 'login'}, '');
+        }
+    } else if (e.state && e.state.page === 'kb') {
+        // 前进到知识库页（用户按了前进按钮）
+        if (currentUser && authToken && currentAgentId) {
+            loginModal.classList.remove('show');
+            chatPage.style.display = 'flex';
+            document.body.classList.add('body-chat-mode');
+            if (chatContent) chatContent.style.display = 'none';
+            if (kbPage) kbPage.style.display = 'flex';
+        } else {
             history.replaceState({page: 'login'}, '');
         }
     } else {
@@ -1347,7 +1366,6 @@ window.addEventListener('popstate', function(e) {
             currentUser = null; userRole = null; authToken = null; selectedFile = null; currentChatId = null; allChats = []; currentAgentId = null; agentKbUploadMode = false;
             localStorage.removeItem('authToken');
             localStorage.removeItem('userRole');
-            const kbPage = document.getElementById('kbPage');
             if (kbPage) kbPage.style.display = 'none';
             chatPage.style.display = 'none';
             loginModal.classList.add('show');
@@ -2796,6 +2814,8 @@ function showKbPage() {
     const agentName = agent ? agent.name : '智能体';
     document.getElementById('kbPageTitle').textContent = agentName + ' - 知识库管理';
     document.getElementById('kbPageDesc').textContent = '上传和管理' + agentName + '相关文档，系统将自动进行向量化处理';
+    // [BUG FIX] 推入历史状态，让浏览器←按钮能回到聊天页
+    history.pushState({page: 'kb'}, '');
     // Load docs
     loadKbPageDocs();
     // Setup drag and drop
@@ -2811,6 +2831,10 @@ function hideKbPage() {
     // 恢复侧边栏
     if (sidebar) sidebar.style.display = '';
     updateCenteredMode();
+    // [BUG FIX] 确保历史状态回到chat（手动关闭知识库时）
+    if (history.state && history.state.page === 'kb') {
+        history.replaceState({page: 'chat'}, '');
+    }
 }
 
 async function loadKbPageDocs() {
