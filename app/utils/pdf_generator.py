@@ -222,7 +222,7 @@ def generate_chat_pdf(messages: list, session_id: str) -> bytes:
 
     story = []
     # 标题
-    story.append(Paragraph("DocAgent 对话记录", title_style))
+    story.append(Paragraph("东风科技研发智能体 对话记录", title_style))
     story.append(Paragraph(f"Session: {session_id[:12]}", info_style))
 
     for msg in messages:

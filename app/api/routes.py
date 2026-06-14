@@ -2502,7 +2502,7 @@ async def export_chat(session_id: str, format: str = "md"):
 
             # 标题
 
-            title_para = doc.add_heading("DocAgent 对话记录", level=1)
+            title_para = doc.add_heading("东风科技研发智能体 对话记录", level=1)
 
             title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
