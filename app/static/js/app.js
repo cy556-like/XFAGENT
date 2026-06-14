@@ -1356,6 +1356,10 @@ window.addEventListener('popstate', function(e) {
             document.body.classList.add('body-chat-mode');
             if (chatContent) chatContent.style.display = 'none';
             if (kbPage) kbPage.style.display = 'flex';
+            // [BUG FIX] 知识库页隐藏侧边栏
+            if (sidebar) sidebar.style.display = 'none';
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+            if (sidebarOverlay) sidebarOverlay.style.display = 'none';
         } else {
             history.replaceState({page: 'login'}, '');
         }
