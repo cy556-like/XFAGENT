@@ -31,7 +31,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from app.config import settings, VISION_MODELS, DEFAULT_VISION_MODEL, VISION_API_KEY, VISION_BASE_URL, FAST_MODELS, DEEPSEEK_MODELS, VOLCENGINE_MODELS, QWEN_MODELS, MIMO_MODELS, GLM_MODELS
 from app.agent.tools import ALL_TOOLS, get_tools, set_current_agent_id, set_current_session_id, get_current_session_id, reset_search_count
-from app.agent.prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_WITH_WEB_SEARCH, CHAT_SYSTEM_PROMPT
+from app.agent.prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_WITH_WEB_SEARCH, CHAT_SYSTEM_PROMPT, get_agent_keywords_section
 from app.memory.manager import get_session_history
 
 logger = logging.getLogger(__name__)
@@ -540,7 +540,7 @@ def _cleanup_stale_graph_cache():
     if stale_keys:
         logger.info(f"[缓存清理] 清理了 {len(stale_keys)} 个过期 Agent Graph 缓存（>{_AGENT_GRAPH_CACHE_TTL}s未使用）")
 
-def _build_agent_prompt(agent_task: str, web_search: bool = False) -> str:
+def _build_agent_prompt(agent_task: str, web_search: bool = False, agent_id: str = None) -> str:
     """根据智能体的任务描述构建专属系统提示词
     
     智能体的任务描述将作为角色定义的优先内容，
@@ -548,8 +548,13 @@ def _build_agent_prompt(agent_task: str, web_search: bool = False) -> str:
     
     关键改进：当智能体有自定义任务描述时，强制要求优先检索知识库，
     避免LLM将专业问题误判为"通用问题"而直接回答。
+    
+    新增：注入该智能体的关键词问题列表，让模型知道何时自动导出文件。
     """
     base_prompt = SYSTEM_PROMPT_WITH_WEB_SEARCH if web_search else SYSTEM_PROMPT
+    
+    # 注入该智能体的关键词问题列表
+    keywords_section = get_agent_keywords_section(agent_id) if agent_id else ""
     
     custom_header = f"""# 角色
 
@@ -594,7 +599,7 @@ def _build_agent_prompt(agent_task: str, web_search: bool = False) -> str:
 │       3. 如果无结果，补充自身知识并标注
 └─ 否 → 直接回答（通用问题）
 ```
-
+{keywords_section}
 """
     
     tools_section_marker = "## 工具选择指南"
@@ -743,7 +748,7 @@ def chat(user_input: str, session_id: str = "default", web_search: bool = False,
     reset_search_count()  # 每轮新对话重置搜索计数
     
     if agent_task:
-        custom_prompt = _inject_current_date(_build_agent_prompt(agent_task, web_search=web_search))
+        custom_prompt = _inject_current_date(_build_agent_prompt(agent_task, web_search=web_search, agent_id=agent_id))
     elif web_search:
         custom_prompt = _inject_current_date(SYSTEM_PROMPT_WITH_WEB_SEARCH)
     else:
@@ -847,7 +852,7 @@ async def chat_stream_generator(user_input: str, session_id: str = "default", we
 
     # Agent模式：走Agent工具调用
     if agent_task:
-        custom_system_prompt = _inject_current_date(_build_agent_prompt(agent_task, web_search=web_search))
+        custom_system_prompt = _inject_current_date(_build_agent_prompt(agent_task, web_search=web_search, agent_id=agent_id))
         agent = get_agent_with_prompt(custom_system_prompt, web_search=web_search)
     else:
         agent = get_agent(web_search=web_search)
