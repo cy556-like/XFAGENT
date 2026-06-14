@@ -1321,6 +1321,9 @@ function doLogout() {
     document.getElementById('chatMessages').innerHTML = '';
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
+    // [BUG FIX] 清除登录消息，避免登出后仍显示"登录成功"
+    const logoutMsg = document.getElementById('loginMsg');
+    if (logoutMsg) { logoutMsg.textContent = ''; logoutMsg.className = 'msg-box'; }
     updateHeaderKbVisibility();
     // [BUG FIX] Update history state so back button is consistent
     if (history.state && (history.state.page === 'chat' || history.state.page === 'kb')) {
@@ -1381,6 +1384,9 @@ window.addEventListener('popstate', function(e) {
             document.getElementById('chatMessages').innerHTML = '';
             document.getElementById('loginUser').value = '';
             document.getElementById('loginPass').value = '';
+            // [BUG FIX] 清除登录消息，避免回退到登录页后仍显示"登录成功"
+            const loginMsg = document.getElementById('loginMsg');
+            if (loginMsg) { loginMsg.textContent = ''; loginMsg.className = 'msg-box'; }
             updateHeaderKbVisibility();
         }
     }
