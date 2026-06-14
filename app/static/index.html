@@ -88,7 +88,7 @@
                 <button class="header-kb-btn" id="headerKbBtn" onclick="showKbPage()" title="知识库" aria-label="知识库" style="display:none;"><span class="kb-btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span><span class="kb-btn-text">知识库</span></button>
             </div>
             <div class="header-actions">
-                <span class="model-label">当前模型</span><select class="model-select" id="modelSelect" onchange="switchModel()" title="切换模型" aria-label="选择模型"></select>
+                <select class="model-select" id="modelSelect" onchange="switchModel()" title="切换模型" aria-label="选择模型"></select>
                 <div class="export-wrapper"><button class="header-btn" onclick="toggleExportDropdown()" title="导出对话" aria-label="导出对话" aria-haspopup="true">📥 导出对话</button><div class="export-dropdown" id="exportDropdown" role="menu"><button onclick="exportChat('docx')" role="menuitem">📝 Word</button><button onclick="exportChat('pdf')" role="menuitem">📄 PDF</button><button onclick="exportChat('md')" role="menuitem">📋 Markdown</button></div></div>
 
             </div>
