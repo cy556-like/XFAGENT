@@ -102,14 +102,16 @@ def generate_pdf(text, output_path, title="修改后的文档"):
 
     try:
         pdf = FPDF()
+        pdf.font_subsetting = False  # 关闭字体子集化，避免 MERG/subset 错误
         pdf.add_page()
         pdf.set_auto_page_break(auto=True, margin=15)
 
         # 添加中文字体
-        pdf.add_font("ChineseFont", "", font_path, uni=True)
+        pdf.add_font("ChineseFont", "", font_path)
         pdf.set_font("ChineseFont", "", 12)
 
-        # 写入内容
+        # 写入内容（预处理移除emoji）
+        text = _strip_emoji(text)
         for line in text.split("\n"):
             if not line.strip():
                 pdf.ln(6)
@@ -142,11 +144,12 @@ def generate_chat_pdf(messages: list, session_id: str) -> bytes:
         raise RuntimeError("未找到中文字体，无法生成 PDF")
 
     pdf = FPDF()
+    pdf.font_subsetting = False  # 关闭字体子集化，避免 MERG/subset 错误
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
     # 添加中文字体
-    pdf.add_font("ChineseFont", "", font_path, uni=True)
+    pdf.add_font("ChineseFont", "", font_path)
     pdf.set_font("ChineseFont", "", 12)
 
     # 标题
