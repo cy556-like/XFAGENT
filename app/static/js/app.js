@@ -638,6 +638,10 @@ async function switchToAgent(agentId) {
     const agent = myAgents.find(a => a.id === agentId);
     if (!agent) return;
 
+    // [BUG FIX #2] 切换智能体时中断正在进行的流式响应
+    // 防止旧SSE流在后台继续运行导致 isLoading 锁死、新聊天无法发送消息
+    stopGeneration();
+
     currentAgentId = agentId;
 
     // Force agent mode (智能体强制使用agent模式)
@@ -1562,6 +1566,9 @@ async function createNewChat() {
 
 async function switchChat(chatId) {
     if (chatId === currentChatId) return;
+    // [BUG FIX #2] 切换聊天时中断正在进行的流式响应
+    // 防止旧SSE流在后台继续运行导致 isLoading 锁死、新聊天无法发送消息
+    stopGeneration();
     currentChatId = chatId;
     modeChatId[currentMode] = chatId;
 
@@ -2176,15 +2183,18 @@ async function downloadExportFile(url) {
 // ===== Send Message =====
 async function sendMessage() {
     if (isLoading) return;
+    // [BUG FIX #1] 竞态条件修复：在 createNewChat() 之前就设置 isLoading
+    // 防止快速双击/连按回车时，第二次调用在 await createNewChat() 期间
+    // 仍通过 isLoading 检查（此时仍为 false），导致创建重复聊天会话
+    isLoading = true;
     if (!currentChatId) {
         // 没有当前对话时自动创建新对话（点击智能体后直接发消息的场景）
         await createNewChat();
-        if (!currentChatId) return;  // 创建失败才退出
+        if (!currentChatId) { isLoading = false; return; }  // 创建失败才退出，同时释放锁
     }
     const input = document.getElementById('msgInput');
     const message = input.value.trim();
-    if (!message && !selectedFile) return;
-    isLoading = true;
+    if (!message && !selectedFile) { isLoading = false; return; }
     const sendBtn = document.getElementById('sendBtn');
     sendBtn.disabled = true;
 
@@ -2991,9 +3001,17 @@ async function deleteKbPageDoc(filename, btnEl) {
     }
 }
 
+// [BUG FIX #3] 防重入守卫：标记拖拽事件是否已绑定，避免重复绑定
+let _kbPageDragDropBound = false;
+
 function setupKbPageDragDrop() {
     const zone = document.getElementById('kbPageUploadZone');
     if (!zone) return;
+    // [BUG FIX #3] 如果已经绑定过事件监听器，直接返回，防止重复绑定
+    // 每次打开知识库页面 showKbPage() 都会调用此函数，但事件监听器不会自动移除
+    // 第N次打开后拖放文件会触发N次上传，导致同一文件被重复上传N次
+    if (_kbPageDragDropBound) return;
+    _kbPageDragDropBound = true;
     zone.addEventListener('dragover', function(e) {
         e.preventDefault();
         e.stopPropagation();
