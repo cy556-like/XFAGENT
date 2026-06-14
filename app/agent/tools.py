@@ -733,7 +733,7 @@ def export_document_tool(content: str, filename: str = "", title: str = "") -> s
         if result["status"] == "success":
             actual_filename = result.get('filename', filename)
             download_url = f"/api/v1/documents/export-download/{actual_filename}"
-            return f"【导出成功】文档已生成：{actual_filename}\n\n下载链接：{download_url}\n\n【重要】请直接将上面的「下载链接」原样展示给用户，不要修改、不要省略URL，不要添加额外说明。"
+            return f"【导出成功】文档已生成：{actual_filename}\n\n下载链接：{download_url}\n\n【重要】请直接将上面的「下载链接」原样展示给用户，不要修改、不要省略URL。\n【重要】不要在对话中重复输出文档的完整内容，用户可以直接下载文件查看。只需简要介绍文档包含什么内容即可。"
         else:
             return f"【导出失败】{result.get('message', '未知错误')}"
     except Exception as e:
@@ -777,7 +777,7 @@ def export_xlsx_tool(content: str, filename: str = "", title: str = "") -> str:
         if result["status"] == "success":
             actual_filename = result.get('filename', filename)
             download_url = f"/api/v1/documents/export-download/{actual_filename}"
-            return f"【导出成功】Excel文档已生成：{actual_filename}\n\n下载链接：{download_url}\n\n【重要】请直接将上面的「下载链接」原样展示给用户，不要修改、不要省略URL，不要添加额外说明。"
+            return f"【导出成功】Excel文档已生成：{actual_filename}\n\n下载链接：{download_url}\n\n【重要】请直接将上面的「下载链接」原样展示给用户，不要修改、不要省略URL。\n【重要】不要在对话中重复输出表格的完整内容，用户可以直接下载文件查看。只需简要介绍文件包含什么内容即可。"
         else:
             return f"【导出失败】{result.get('message', '未知错误')}"
     except Exception as e:
