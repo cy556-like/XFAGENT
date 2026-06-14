@@ -1,7 +1,7 @@
 """
 PDF 生成工具模块
-使用 fpdf2 生成 PDF，支持中文字体
-如果 fpdf2 不可用，自动降级为保存 .txt 文件
+使用 reportlab 生成 PDF，支持中文字体
+如果 reportlab 不可用，回退到 fpdf2，再不可用则降级为 txt
 """
 import os
 import re
@@ -20,7 +20,6 @@ CHINESE_FONT_PATHS = {
     "Linux": [
         "/usr/share/fonts/truetype/chinese/SarasaMonoSC-Regular.ttf",
         "/usr/share/fonts/truetype/chinese/NotoSansSC-Regular.ttf",
-        "/usr/share/fonts/truetype/chinese/NotoSansSC[wght].ttf",
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     ],
     "Darwin": [
@@ -29,9 +28,7 @@ CHINESE_FONT_PATHS = {
     ],
 }
 
-# Emoji 和特殊符号过滤正则：
-# 匹配 BMP 之外的所有字符（emoji 如 ✅📥🤖等，code point > 0xFFFF）
-# 以及 BMP 内的特殊符号（Dingbats、Misc Symbols 等）
+# Emoji 过滤正则：移除 PDF 字体无法渲染的字符
 _EMOJI_RE = re.compile(
     "["
     "\U0001F600-\U0001F64F"  # 表情符号
@@ -48,7 +45,7 @@ _EMOJI_RE = re.compile(
     "\U0000FE00-\U0000FE0F"  # Variation Selectors
     "\U0000200D"             # Zero Width Joiner
     "\U00002B50"             # ⭐
-    "\U000023E9-\U000023F3"  # Misc symbols (⏩⏪⏭⏮⏯等)
+    "\U000023E9-\U000023F3"  # Misc symbols
     "\U000023F0-\U000023FA"  # ⏰⏱⏲⏳
     "\U000025AA-\U000025FE"  # 几何形状
     "\U00002934-\U00002935"  # ⤴⤵
@@ -58,10 +55,8 @@ _EMOJI_RE = re.compile(
 
 
 def _strip_emoji(text: str) -> str:
-    """移除文本中的 emoji 和字体不支持的特殊字符，替换为 [x] 标记"""
-    # 先移除完整的 emoji 序列
+    """移除文本中的 emoji 和字体不支持的特殊字符"""
     cleaned = _EMOJI_RE.sub("", text)
-    # 再移除剩余的非 BMP 字符（超出基本多文种平面的字符）
     cleaned = "".join(c for c in cleaned if ord(c) <= 0xFFFF)
     return cleaned
 
@@ -86,49 +81,93 @@ def generate_pdf(text, output_path, title="修改后的文档"):
 
     Returns:
         tuple: (success: bool, actual_path: str)
-            如果 PDF 生成成功，返回 (True, pdf_path)
-            如果降级为 txt，返回 (True, txt_path)
     """
     try:
-        from fpdf import FPDF
+        return _generate_pdf_reportlab(text, output_path, title)
     except ImportError:
-        logger.warning("fpdf2 未安装，降级为 txt 文件")
-        return _save_as_txt(text, output_path)
+        logger.warning("reportlab 未安装，回退到 fpdf2")
+    except Exception as e:
+        logger.warning(f"reportlab PDF 生成失败: {e}，回退到 fpdf2")
 
-    font_path = find_chinese_font()
-    if not font_path:
-        logger.warning("未找到中文字体，降级为 txt 文件")
-        return _save_as_txt(text, output_path)
-
+    # 回退到 fpdf2
     try:
-        pdf = FPDF()
-        pdf.font_subsetting = False  # 关闭字体子集化，避免 MERG/subset 错误
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
-
-        # 添加中文字体
-        pdf.add_font("ChineseFont", "", font_path)
-        pdf.set_font("ChineseFont", "", 12)
-
-        # 写入内容（预处理移除emoji）
-        text = _strip_emoji(text)
-        for line in text.split("\n"):
-            if not line.strip():
-                pdf.ln(6)
-                continue
-            pdf.multi_cell(0, 7, line)
-
-        pdf.output(output_path)
-        return True, output_path
-
+        return _generate_pdf_fpdf(text, output_path, title)
+    except ImportError:
+        logger.warning("fpdf2 也未安装，降级为 txt 文件")
+        return _save_as_txt(text, output_path)
     except Exception as e:
         logger.error(f"PDF 生成失败: {e}，降级为 txt 文件")
         return _save_as_txt(text, output_path)
 
 
+def _generate_pdf_reportlab(text, output_path, title="修改后的文档"):
+    """使用 reportlab 生成 PDF"""
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    font_path = find_chinese_font()
+    if not font_path:
+        raise RuntimeError("未找到中文字体")
+
+    font_name = "ChineseFont"
+    pdfmetrics.registerFont(TTFont(font_name, font_path))
+
+    text = _strip_emoji(text)
+
+    doc = SimpleDocTemplate(output_path, pagesize=A4)
+    title_style = ParagraphStyle('Title', fontName=font_name, fontSize=16, leading=22, alignment=1)
+    body_style = ParagraphStyle('Body', fontName=font_name, fontSize=10, leading=14)
+
+    story = []
+    story.append(Paragraph(title, title_style))
+    story.append(Spacer(1, 6 * mm))
+
+    for line in text.split("\n"):
+        if not line.strip():
+            story.append(Spacer(1, 3 * mm))
+            continue
+        safe_line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        story.append(Paragraph(safe_line, body_style))
+
+    doc.build(story)
+    return True, output_path
+
+
+def _generate_pdf_fpdf(text, output_path, title="修改后的文档"):
+    """使用 fpdf2 生成 PDF（回退方案）"""
+    from fpdf import FPDF
+
+    font_path = find_chinese_font()
+    if not font_path:
+        raise RuntimeError("未找到中文字体")
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_font("ChineseFont", "", font_path)
+    pdf.set_font("ChineseFont", "", 12)
+
+    text = _strip_emoji(text)
+    for line in text.split("\n"):
+        if not line.strip():
+            pdf.ln(6)
+            continue
+        try:
+            pdf.multi_cell(0, 7, line)
+        except Exception:
+            pass
+
+    pdf.output(output_path)
+    return True, output_path
+
+
 def generate_chat_pdf(messages: list, session_id: str) -> bytes:
     """
-    生成对话导出 PDF（返回 bytes）
+    生成对话导出 PDF（返回 bytes），使用 reportlab
 
     Args:
         messages: 对话消息列表 [{"role": "user"/"assistant", "content": "..."}]
@@ -137,86 +176,93 @@ def generate_chat_pdf(messages: list, session_id: str) -> bytes:
     Returns:
         PDF 文件的 bytes 内容
     """
-    from fpdf import FPDF
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.lib.colors import HexColor
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from io import BytesIO
 
     font_path = find_chinese_font()
     if not font_path:
         raise RuntimeError("未找到中文字体，无法生成 PDF")
 
-    pdf = FPDF()
-    pdf.font_subsetting = False  # 关闭字体子集化，避免 MERG/subset 错误
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    font_name = "ChineseFont"
+    pdfmetrics.registerFont(TTFont(font_name, font_path))
 
-    # 添加中文字体
-    pdf.add_font("ChineseFont", "", font_path)
-    pdf.set_font("ChineseFont", "", 12)
+    # 定义样式
+    title_style = ParagraphStyle(
+        'Title', fontName=font_name, fontSize=16, leading=22,
+        alignment=1, spaceAfter=4 * mm
+    )
+    info_style = ParagraphStyle(
+        'Info', fontName=font_name, fontSize=9, leading=13,
+        alignment=1, textColor=HexColor('#888888'), spaceAfter=8 * mm
+    )
+    role_user_style = ParagraphStyle(
+        'RoleUser', fontName=font_name, fontSize=11, leading=16,
+        textColor=HexColor('#1a1a1a'), spaceAfter=2 * mm
+    )
+    role_assistant_style = ParagraphStyle(
+        'RoleAssistant', fontName=font_name, fontSize=11, leading=16,
+        textColor=HexColor('#1976D2'), spaceAfter=2 * mm
+    )
+    content_style = ParagraphStyle(
+        'Content', fontName=font_name, fontSize=10, leading=14,
+        spaceAfter=2 * mm
+    )
 
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=15 * mm, bottomMargin=15 * mm)
+
+    story = []
     # 标题
-    pdf.set_font("ChineseFont", "", 16)
-    pdf.cell(0, 12, "DocAgent 对话记录", ln=True, align="C")
-    pdf.set_font("ChineseFont", "", 10)
-    pdf.cell(0, 8, f"Session: {session_id[:12]}", ln=True, align="C")
-    pdf.ln(8)
+    story.append(Paragraph("DocAgent 对话记录", title_style))
+    story.append(Paragraph(f"Session: {session_id[:12]}", info_style))
 
-    # 写入对话内容
     for msg in messages:
         role = "用户" if msg["role"] == "user" else "助手"
         content = msg.get("content", "")
 
-        # 预处理：移除 emoji 和字体不支持的字符
+        # 预处理：移除 emoji
         content = _strip_emoji(content)
 
-        # 角色标签
-        pdf.set_font("ChineseFont", "", 11)
-        if msg["role"] == "user":
-            pdf.set_fill_color(240, 240, 240)
-            pdf.cell(0, 8, f"  {role}：", ln=True, fill=True)
-        else:
-            pdf.set_fill_color(245, 245, 255)
-            pdf.cell(0, 8, f"  {role}：", ln=True, fill=True)
+        # 转义 XML 特殊字符（reportlab Paragraph 使用 XML 标记）
+        role_safe = role.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-        # 内容
-        pdf.set_font("ChineseFont", "", 10)
+        # 角色标签
+        role_style = role_user_style if msg["role"] == "user" else role_assistant_style
+        story.append(Paragraph(f"<b>{role_safe}：</b>", role_style))
+
+        # 内容：按行分段，避免超长段落
         for line in content.split("\n"):
             if not line.strip():
-                pdf.ln(3)
+                story.append(Spacer(1, 2 * mm))
                 continue
-            _safe_write_line(pdf, line)
-
-        pdf.ln(4)
-
-    # 输出为 bytes
-    return pdf.output()
-
-
-def _safe_write_line(pdf, line: str, indent: str = "  "):
-    """
-    安全地将一行文本写入PDF，处理超长行和特殊字符
-
-    fpdf2 的 multi_cell 在遇到无法换行的长字符时会抛出
-    "Not enough horizontal space" 异常，这里做逐字符安全写入
-    """
-    text = indent + line
-    try:
-        pdf.multi_cell(0, 6, text)
-    except Exception:
-        # 降级：逐段写入，每段不超过80字符
-        while text:
-            chunk = text[:80]
-            text = text[80:]
+            safe_line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             try:
-                pdf.multi_cell(0, 6, chunk)
+                story.append(Paragraph(safe_line, content_style))
             except Exception:
-                # 最终降级：跳过无法渲染的字符
-                safe_chunk = "".join(
-                    c for c in chunk if ord(c) < 0x10000 and c.isprintable() or c in " \t"
+                # 最终降级：逐字符过滤
+                very_safe = "".join(
+                    c for c in line if c.isprintable() or c in " \t"
                 )
-                if safe_chunk.strip():
+                very_safe = very_safe.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                if very_safe.strip():
                     try:
-                        pdf.multi_cell(0, 6, safe_chunk)
+                        story.append(Paragraph(very_safe, content_style))
                     except Exception:
-                        pass  # 跳过完全无法渲染的行
+                        pass
+
+        # 分隔线
+        story.append(Spacer(1, 2 * mm))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2 * mm))
+
+    doc.build(story)
+    return buf.getvalue()
 
 
 def _save_as_txt(text, output_path):
