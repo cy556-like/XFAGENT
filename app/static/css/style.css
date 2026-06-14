@@ -1484,7 +1484,7 @@ html { scroll-behavior: smooth; }
     padding: 6px 12px;
 }
 .sidebar-chats-title {
-    margin-top: 4px;
+    display: none;
 }
 
 /* ===== Chat Main Area ===== */
