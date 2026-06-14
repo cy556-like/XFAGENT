@@ -4,6 +4,7 @@ PDF 生成工具模块
 如果 fpdf2 不可用，自动降级为保存 .txt 文件
 """
 import os
+import re
 import platform
 import logging
 
@@ -27,6 +28,42 @@ CHINESE_FONT_PATHS = {
         "/Library/Fonts/Arial Unicode.ttf",
     ],
 }
+
+# Emoji 和特殊符号过滤正则：
+# 匹配 BMP 之外的所有字符（emoji 如 ✅📥🤖等，code point > 0xFFFF）
+# 以及 BMP 内的特殊符号（Dingbats、Misc Symbols 等）
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F600-\U0001F64F"  # 表情符号
+    "\U0001F300-\U0001F5FF"  # 杂项符号和象形文字
+    "\U0001F680-\U0001F6FF"  # 交通和地图符号
+    "\U0001F1E0-\U0001F1FF"  # 旗帜
+    "\U00002702-\U000027B0"  # Dingbats (✅✓✗等)
+    "\U000024C2-\U0001F251"  # Enclosed characters
+    "\U0001f900-\U0001f9FF"  # 补充表情符号
+    "\U0001fa00-\U0001fa6F"  # Chess symbols
+    "\U0001fa70-\U0001faFF"  # Symbols and Pictographs Extended-A
+    "\U00002600-\U000026FF"  # Misc symbols (☀☁☂等)
+    "\U00002700-\U000027BF"  # Dingbats
+    "\U0000FE00-\U0000FE0F"  # Variation Selectors
+    "\U0000200D"             # Zero Width Joiner
+    "\U00002B50"             # ⭐
+    "\U000023E9-\U000023F3"  # Misc symbols (⏩⏪⏭⏮⏯等)
+    "\U000023F0-\U000023FA"  # ⏰⏱⏲⏳
+    "\U000025AA-\U000025FE"  # 几何形状
+    "\U00002934-\U00002935"  # ⤴⤵
+    "\U00002B05-\U00002B07"  # ⬅⬆⬇
+    "]+"
+)
+
+
+def _strip_emoji(text: str) -> str:
+    """移除文本中的 emoji 和字体不支持的特殊字符，替换为 [x] 标记"""
+    # 先移除完整的 emoji 序列
+    cleaned = _EMOJI_RE.sub("", text)
+    # 再移除剩余的非 BMP 字符（超出基本多文种平面的字符）
+    cleaned = "".join(c for c in cleaned if ord(c) <= 0xFFFF)
+    return cleaned
 
 
 def find_chinese_font():
@@ -124,6 +161,9 @@ def generate_chat_pdf(messages: list, session_id: str) -> bytes:
         role = "用户" if msg["role"] == "user" else "助手"
         content = msg.get("content", "")
 
+        # 预处理：移除 emoji 和字体不支持的字符
+        content = _strip_emoji(content)
+
         # 角色标签
         pdf.set_font("ChineseFont", "", 11)
         if msg["role"] == "user":
@@ -139,7 +179,6 @@ def generate_chat_pdf(messages: list, session_id: str) -> bytes:
             if not line.strip():
                 pdf.ln(3)
                 continue
-            # 安全写入：将单行拆分处理，避免超长行或特殊字符导致渲染失败
             _safe_write_line(pdf, line)
 
         pdf.ln(4)
