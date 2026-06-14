@@ -29,6 +29,7 @@ CHINESE_FONT_PATHS = {
 }
 
 # Emoji 过滤正则：移除 PDF 字体无法渲染的字符
+# 注意：范围必须精确，不能包含中文字符区间(U+4E00-U+9FFF)
 _EMOJI_RE = re.compile(
     "["
     "\U0001F600-\U0001F64F"  # 表情符号
@@ -36,7 +37,9 @@ _EMOJI_RE = re.compile(
     "\U0001F680-\U0001F6FF"  # 交通和地图符号
     "\U0001F1E0-\U0001F1FF"  # 旗帜
     "\U00002702-\U000027B0"  # Dingbats (✅✓✗等)
-    "\U000024C2-\U0001F251"  # Enclosed characters
+    "\U00002460-\U000024FF"  # Enclosed Alphanumerics (⑀⑁⑂等)
+    "\U0001F100-\U0001F1FF"  # Enclosed Alphanumeric Supplement
+    "\U0001F200-\U0001F2FF"  # Enclosed Ideographic Supplement (🉐🉑等)
     "\U0001f900-\U0001f9FF"  # 补充表情符号
     "\U0001fa00-\U0001fa6F"  # Chess symbols
     "\U0001fa70-\U0001faFF"  # Symbols and Pictographs Extended-A
