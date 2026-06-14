@@ -139,12 +139,42 @@ def generate_chat_pdf(messages: list, session_id: str) -> bytes:
             if not line.strip():
                 pdf.ln(3)
                 continue
-            pdf.multi_cell(0, 6, f"  {line}")
+            # 安全写入：将单行拆分处理，避免超长行或特殊字符导致渲染失败
+            _safe_write_line(pdf, line)
 
         pdf.ln(4)
 
     # 输出为 bytes
     return pdf.output()
+
+
+def _safe_write_line(pdf, line: str, indent: str = "  "):
+    """
+    安全地将一行文本写入PDF，处理超长行和特殊字符
+
+    fpdf2 的 multi_cell 在遇到无法换行的长字符时会抛出
+    "Not enough horizontal space" 异常，这里做逐字符安全写入
+    """
+    text = indent + line
+    try:
+        pdf.multi_cell(0, 6, text)
+    except Exception:
+        # 降级：逐段写入，每段不超过80字符
+        while text:
+            chunk = text[:80]
+            text = text[80:]
+            try:
+                pdf.multi_cell(0, 6, chunk)
+            except Exception:
+                # 最终降级：跳过无法渲染的字符
+                safe_chunk = "".join(
+                    c for c in chunk if ord(c) < 0x10000 and c.isprintable() or c in " \t"
+                )
+                if safe_chunk.strip():
+                    try:
+                        pdf.multi_cell(0, 6, safe_chunk)
+                    except Exception:
+                        pass  # 跳过完全无法渲染的行
 
 
 def _save_as_txt(text, output_path):
