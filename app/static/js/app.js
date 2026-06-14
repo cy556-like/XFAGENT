@@ -1281,11 +1281,11 @@ async function doLogin() {
                 document.body.classList.add('body-chat-mode');
                 // [BUG FIX] Push history state so browser back button returns to login
                 history.pushState({page: 'chat'}, '');
-                document.getElementById('sidebarUsername').textContent = username;
-                document.getElementById('sidebarAvatar').textContent = username[0].toUpperCase();
+                document.getElementById('headerUserName').textContent = username;
+                document.getElementById('headerUserAvatar').textContent = username[0].toUpperCase();
                 // 显示管理员标识
                 if (userRole === 'admin') {
-                    document.getElementById('sidebarUsername').textContent = username + ' (管理员)';
+                    document.getElementById('headerUserName').textContent = username + ' (管理员)';
                 }
                 loadChatList();
                 loadModels();
@@ -1321,6 +1321,11 @@ function doLogout() {
     document.getElementById('chatMessages').innerHTML = '';
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
+    // 清除header用户信息
+    const headerUserName = document.getElementById('headerUserName');
+    const headerUserAvatar = document.getElementById('headerUserAvatar');
+    if (headerUserName) headerUserName.textContent = '';
+    if (headerUserAvatar) headerUserAvatar.textContent = '';
     // [BUG FIX] 清除登录消息，避免登出后仍显示"登录成功"
     const logoutMsg = document.getElementById('loginMsg');
     if (logoutMsg) { logoutMsg.textContent = ''; logoutMsg.className = 'msg-box'; }
@@ -1408,8 +1413,8 @@ async function tryAutoLogin() {
             document.body.classList.add('body-chat-mode');
             // [BUG FIX] Push history state so browser back button returns to login
             history.pushState({page: 'chat'}, '');
-            document.getElementById('sidebarUsername').textContent = data.username;
-            document.getElementById('sidebarAvatar').textContent = data.username[0].toUpperCase();
+            document.getElementById('headerUserName').textContent = data.username;
+            document.getElementById('headerUserAvatar').textContent = data.username[0].toUpperCase();
             loadChatList();
             loadModels();
             await syncAgentsFromServer(true);  // [#12] 自动登录时强制同步
@@ -1519,6 +1524,19 @@ function renderChatList() {
     list.innerHTML = '';
     // 只显示当前模式的会话
     const modeChats = getModeChats();
+    // 控制底部提示文字的显示
+    const footerHint = document.getElementById('sidebarFooterHint');
+    if (footerHint) {
+        if (currentAgentId && modeChats.length === 0) {
+            footerHint.textContent = '暂无历史对话';
+            footerHint.style.display = '';
+        } else if (!currentAgentId) {
+            footerHint.textContent = '选择智能体查看历史对话';
+            footerHint.style.display = '';
+        } else {
+            footerHint.style.display = 'none';
+        }
+    }
     modeChats.forEach(chat => {
         const item = document.createElement('div');
         item.className = `chat-item${chat.chat_id === currentChatId ? ' active' : ''}`;

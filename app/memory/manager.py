@@ -343,7 +343,7 @@ def _save_user_chats(username: str, chats: list[dict]) -> None:
 
 
 # 每个智能体最多保留的历史对话数量
-MAX_CHATS_PER_AGENT = 5
+MAX_CHATS_PER_AGENT = 2
 
 
 def create_chat(username: str, title: str = "新对话", mode: str = "agent", agent_id: str = None) -> dict:
